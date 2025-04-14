@@ -14,14 +14,21 @@ import (
 	"github.com/rotisserie/eris"
 )
 
-func downloadPhotos(tweet *twitterscraper.Tweet) error {
+func downloadPhotos(tweet *twitterscraper.Tweet, cfg Config) error {
 	var errors []error
+	photosCount := len(tweet.Photos)
 
-	if len(tweet.Photos) > 0 {
-		for _, t := range tweet.Photos {
-			url := t.URL + "?name=orig"
+	if photosCount > 0 {
+		for i, photo := range tweet.Photos {
+			urlStr := photo.URL + "?name=orig"
 
-			if err := downloadFile(url, tweet); err != nil {
+			filename, err := buildTweetMediaFilename(urlStr, i, photosCount, tweet)
+			if err != nil {
+				errors = append(errors, err)
+				continue
+			}
+
+			if err := downloadFile(urlStr, filename, tweet, cfg); err != nil {
 				errors = append(errors, err)
 			}
 		}
@@ -34,27 +41,39 @@ func downloadPhotos(tweet *twitterscraper.Tweet) error {
 	return nil
 }
 
-func downloadFile(urlStr string, tweet *twitterscraper.Tweet) error {
+func buildTweetMediaFilename(urlStr string, index int, total int, tweet *twitterscraper.Tweet) (string, error) {
 	// Get the file extension (keep as is)
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return eris.Wrap(err, "failed to parse URL")
+		return "", eris.Wrap(err, "failed to parse URL")
 	}
 
 	fileExt := strings.ToLower(path.Ext(parsedURL.Path))
 
+	var filename string
+
 	// Format: twitter-@from_yukana-20250105-150007-1875920219195195742.jpg
-	outputPath := path.Join(MEDIA_DIR,
-		fmt.Sprintf("twitter-@%s-%s-%s%s",
-			tweet.Username,
-			tweet.TimeParsed.In(time.Local).Format("20060102-150405"),
-			tweet.ID,
-			fileExt,
-		))
+	filenameBase := fmt.Sprintf("twitter-@%s-%s-%s",
+		tweet.Username,
+		tweet.TimeParsed.In(time.Local).Format("20060102-150405"),
+		tweet.ID,
+	)
+
+	if total > 1 {
+		filename = fmt.Sprintf("%s-%d%s", filenameBase, index, fileExt)
+	} else {
+		filename = fmt.Sprintf("%s%s", filenameBase, fileExt)
+	}
+
+	return filename, nil
+}
+
+func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, cfg Config) error {
+	outputPath := path.Join(cfg.MediaDir, filename)
 
 	// Create output directory if it doesn't exist
-	if _, err := os.Stat(MEDIA_DIR); os.IsNotExist(err) {
-		if err := os.MkdirAll(MEDIA_DIR, 0755); err != nil {
+	if _, err := os.Stat(cfg.MediaDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(cfg.MediaDir, 0755); err != nil {
 			return eris.Wrap(err, "failed to create output directory")
 		}
 	}
