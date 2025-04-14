@@ -11,7 +11,7 @@ import (
 	"github.com/rotisserie/eris"
 )
 
-const COOKIE_FILENAME = "x.com_cookies.json"
+const COOKIES_FILENAME = "x.com_cookies.json"
 
 type jsonCookie struct {
 	Name           string  `json:"name"`
@@ -25,7 +25,7 @@ type jsonCookie struct {
 }
 
 func parseCookie() ([]*http.Cookie, error) {
-	f, err := os.Open(COOKIE_FILENAME)
+	f, err := os.Open(COOKIES_FILENAME)
 	if err != nil {
 		return nil, eris.Wrap(err, "error opening cookies file")
 	}

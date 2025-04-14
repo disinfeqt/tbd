@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"runtime/debug"
 	"strings"
 
@@ -37,7 +36,15 @@ func init() {
 }
 
 func main() {
+	err := InitLogger("logs")
+	if err != nil {
+		FatalError(eris.Wrap(err, "Failed to initialize logger"))
+	}
+	defer CloseLogger()
+
 	scraper := initScraper()
+
+	processedBookmarksCount := 0
 
 	for tweet := range scraper.GetBookmarks(context.Background(), config.MaxBookmarksCount) {
 		if tweet.Error != nil {
@@ -46,22 +53,28 @@ func main() {
 			continue // Continue process next bookmark
 		}
 
-		fmt.Printf("Processing Tweet: %s\n", tweet.ID)
+		PrintInfoF("Processing Tweet: %s\n", tweet.ID)
+
 		err := saveTweet(&tweet.Tweet, config)
 		if err != nil {
 			PrintError(eris.Wrap(err, "Error:"))
 		}
+
 		err = downloadPhotos(&tweet.Tweet, config)
 		if err != nil {
 			PrintError(err)
 		}
+
+		processedBookmarksCount += 1
 	}
+
+	PrintInfoF("Successfully processed %d bookmarks\n", processedBookmarksCount)
 }
 
 func initScraper() *twitterscraper.Scraper {
 	cookies, err := parseCookie()
 	if err != nil {
-		err = eris.Wrap(err, "Error parsing cookies")
+		err = eris.Wrapf(err, "Failed to parse cookies file: %s", COOKIES_FILENAME)
 		FatalError(err)
 	}
 

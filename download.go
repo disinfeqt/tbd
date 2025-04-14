@@ -49,7 +49,7 @@ func saveTweet(tweet *twitterscraper.Tweet, cfg Config) error {
 		return eris.Wrap(err, "failed to set modified time")
 	}
 
-	fmt.Printf("  Saved: %s\n", outputPath)
+	PrintInfoF("  Saved: %s\n", outputPath)
 	return nil
 }
 
@@ -137,9 +137,17 @@ func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, c
 	defer CloseResource(out)
 
 	// Copy content from response body to local file
-	_, err = io.Copy(out, resp.Body)
+	fileSize, err := io.Copy(out, resp.Body)
 	if err != nil {
 		return eris.Wrap(err, "failed to copy content to local file")
+	}
+
+	if resp.ContentLength > 0 {
+		if fileSize != resp.ContentLength {
+			return eris.Errorf("download incomplete, expected %d bytes, got %d bytes.", resp.ContentLength, fileSize)
+		}
+	} else {
+		PrintWarning("Content-Length header not provided by the server.")
 	}
 
 	err = os.Chtimes(outputPath, time.Now(), tweet.TimeParsed)
@@ -147,6 +155,6 @@ func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, c
 		return eris.Wrap(err, "failed to set modified time")
 	}
 
-	fmt.Printf("  Downloaded: %s\n", outputPath)
+	PrintInfoF("  Downloaded: %s\n", outputPath)
 	return nil
 }
