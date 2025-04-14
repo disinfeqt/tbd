@@ -7,7 +7,11 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/rotisserie/eris"
 )
+
+const COOKIE_FILENAME = "x.com_cookies.json"
 
 type jsonCookie struct {
 	Name           string  `json:"name"`
@@ -20,23 +24,21 @@ type jsonCookie struct {
 	SameSite       string  `json:"sameSite"`
 }
 
-func parseCookie() []*http.Cookie {
-	f, err := os.Open("x.com_cookies.json")
+func parseCookie() ([]*http.Cookie, error) {
+	f, err := os.Open(COOKIE_FILENAME)
 	if err != nil {
-		log.Println(err)
-		log.Fatal("Error opening cookies file")
+		return nil, eris.Wrap(err, "error opening cookies file")
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Fatal("Error closing file:", err)
+			Fatal(eris.ToString(err, !isReleaseBuild))
 		}
 	}()
 
 	var jsonCookies []jsonCookie
 	err = json.NewDecoder(f).Decode(&jsonCookies)
 	if err != nil {
-		log.Println(err)
-		log.Fatal("Invalid cookies file format")
+		return nil, eris.Wrap(err, "invalid cookies file format")
 	}
 
 	var cookies []*http.Cookie
@@ -78,7 +80,7 @@ func parseCookie() []*http.Cookie {
 		cookies = append(cookies, cookie)
 	}
 
-	return cookies
+	return cookies, nil
 }
 
 func convertExpirationDate(timestamp float64) time.Time {
