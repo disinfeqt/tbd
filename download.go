@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,44 @@ import (
 	twitterscraper "github.com/imperatrona/twitter-scraper"
 	"github.com/rotisserie/eris"
 )
+
+func saveTweet(tweet *twitterscraper.Tweet, cfg Config) error {
+	filename := fmt.Sprintf("twitter-@%s-%s-%s.json",
+		tweet.Username,
+		tweet.TimeParsed.In(time.Local).Format("20060102-150405"),
+		tweet.ID,
+	)
+	outputPath := path.Join(cfg.TweetsDir, filename)
+
+	jsonData, err := json.MarshalIndent(tweet, "", "  ")
+	if err != nil {
+		return eris.Wrap(err, "failed to generate JSON")
+	}
+
+	if _, err := os.Stat(cfg.TweetsDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(cfg.TweetsDir, 0755); err != nil {
+			return eris.Wrap(err, "failed to create tweets directory")
+		}
+	}
+
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return eris.Wrap(err, "failed to create tweet file")
+	}
+
+	_, err = f.Write(jsonData)
+	if err != nil {
+		return eris.Wrap(err, "failed to write tweet file")
+	}
+
+	err = os.Chtimes(outputPath, time.Now(), tweet.TimeParsed)
+	if err != nil {
+		return eris.Wrap(err, "failed to set modified time")
+	}
+
+	fmt.Printf("  Saved: %s\n", outputPath)
+	return nil
+}
 
 func downloadPhotos(tweet *twitterscraper.Tweet, cfg Config) error {
 	var errors []error
@@ -74,7 +113,7 @@ func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, c
 	// Create output directory if it doesn't exist
 	if _, err := os.Stat(cfg.MediaDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(cfg.MediaDir, 0755); err != nil {
-			return eris.Wrap(err, "failed to create output directory")
+			return eris.Wrap(err, "failed to create media directory")
 		}
 	}
 
@@ -108,6 +147,6 @@ func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, c
 		return eris.Wrap(err, "failed to set modified time")
 	}
 
-	fmt.Printf("Downloaded: %s to %s\n", urlStr, outputPath)
+	fmt.Printf("  Downloaded: %s\n", outputPath)
 	return nil
 }

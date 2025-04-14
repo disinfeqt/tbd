@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	MediaDir          string
+	TweetsDir         string
 	MaxBookmarksCount int
 }
 
@@ -19,7 +20,8 @@ var isReleaseBuild bool
 
 var config Config = Config{
 	MediaDir:          "media",
-	MaxBookmarksCount: 10000,
+	TweetsDir:         "tweets",
+	MaxBookmarksCount: 100000,
 }
 
 func init() {
@@ -44,8 +46,12 @@ func main() {
 			continue // Continue process next bookmark
 		}
 
-		fmt.Printf("%s: %s\n", tweet.Username, tweet.Text)
-		err := downloadPhotos(&tweet.Tweet, config)
+		fmt.Printf("Processing Tweet: %s\n", tweet.ID)
+		err := saveTweet(&tweet.Tweet, config)
+		if err != nil {
+			PrintError(eris.Wrap(err, "Error:"))
+		}
+		err = downloadPhotos(&tweet.Tweet, config)
 		if err != nil {
 			PrintError(err)
 		}
@@ -61,6 +67,7 @@ func initScraper() *twitterscraper.Scraper {
 
 	scraper := twitterscraper.New()
 	scraper.SetCookies(cookies)
+	scraper.WithDelay(2)
 
 	// Call IsLoggedIn method to perform authentication
 	if !scraper.IsLoggedIn() {
