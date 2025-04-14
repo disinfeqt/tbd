@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,11 +29,7 @@ func parseCookie() ([]*http.Cookie, error) {
 	if err != nil {
 		return nil, eris.Wrap(err, "error opening cookies file")
 	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			Fatal(eris.ToString(err, !isReleaseBuild))
-		}
-	}()
+	defer CloseResource(f)
 
 	var jsonCookies []jsonCookie
 	err = json.NewDecoder(f).Decode(&jsonCookies)
@@ -74,7 +70,7 @@ func parseCookie() ([]*http.Cookie, error) {
 		case "no_restriction":
 			cookie.SameSite = http.SameSiteNoneMode
 		default:
-			log.Printf("Warning: Unknown SameSite value '%s', defaulting to SameSiteDefaultMode\n", jc.SameSite)
+			fmt.Printf("Warning: Unknown SameSite value '%s', defaulting to SameSiteDefaultMode\n", jc.SameSite)
 			cookie.SameSite = http.SameSiteDefaultMode
 		}
 		cookies = append(cookies, cookie)
