@@ -45,6 +45,7 @@ func main() {
 	scraper := initScraper()
 
 	processedBookmarksCount := 0
+	var errors []error
 
 	for tweet := range scraper.GetBookmarks(context.Background(), config.MaxBookmarksCount) {
 		if tweet.Error != nil {
@@ -57,18 +58,28 @@ func main() {
 
 		err := saveTweet(&tweet.Tweet, config)
 		if err != nil {
-			PrintError(eris.Wrap(err, "Error:"))
+			err = eris.Wrapf(err, " Tweet: %s", tweet.ID)
+			PrintError(err)
+			errors = append(errors, err)
 		}
 
 		err = downloadMedia(&tweet.Tweet, config)
 		if err != nil {
+			err = eris.Wrapf(err, " Tweet: %s", tweet.ID)
 			PrintError(err)
+			errors = append(errors, err)
 		}
 
 		processedBookmarksCount += 1
 	}
 
 	PrintInfoF("Successfully processed %d bookmarks", processedBookmarksCount)
+	if len(errors) > 0 {
+		PrintWarningF("  With %d errors", len(errors))
+		for _, err := range errors {
+			PrintError(err)
+		}
+	}
 }
 
 func initScraper() *twitterscraper.Scraper {

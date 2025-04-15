@@ -125,13 +125,13 @@ func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, c
 	if fileInfo, err := os.Stat(outputPath); err == nil {
 		resp, err := http.Head(urlStr)
 		if err != nil {
-			return eris.Wrap(err, "failed to check remote file size")
-		}
-
-		if resp.ContentLength > 0 {
-			if fileInfo.Size() == resp.ContentLength {
-				PrintInfoF("  Skipped: %s", outputPath)
-				return nil
+			PrintWarning("Failed to check remote file size, force downloading")
+		} else {
+			if resp.ContentLength > 0 {
+				if fileInfo.Size() == resp.ContentLength {
+					PrintInfoF("  Skipped: %s", outputPath)
+					return nil
+				}
 			}
 		}
 	}
