@@ -60,7 +60,7 @@ func main() {
 			PrintError(eris.Wrap(err, "Error:"))
 		}
 
-		err = downloadPhotos(&tweet.Tweet, config)
+		err = downloadMedia(&tweet.Tweet, config)
 		if err != nil {
 			PrintError(err)
 		}

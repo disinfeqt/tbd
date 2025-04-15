@@ -1,0 +1,3 @@
+[submodule "twitter-scraper"]
+	path = twitter-scraper
+	url = git@github.com:rainux/twitter-scraper.git

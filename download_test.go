@@ -48,10 +48,25 @@ func TestMultiplePhotos(t *testing.T) {
 	tweet, err := scraper.GetTweet(id)
 	assert.Equal(t, nil, err)
 
-	err = downloadPhotos(tweet, config)
+	err = downloadMedia(tweet, config)
 	assert.Equal(t, nil, err)
 	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-0.jpg")
 	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-1.jpg")
 	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-2.jpg")
 	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-3.jpg")
+}
+
+func TestMixedMedia(t *testing.T) {
+	const urlStr = "https://x.com/YamoakaMei/status/1911758791701332134"
+
+	id := path.Base(urlStr)
+	tweet, err := scraper.GetTweet(id)
+	assert.Equal(t, nil, err)
+
+	err = downloadMedia(tweet, config)
+	assert.Equal(t, nil, err)
+	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-0.mp4")
+	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-1.mp4")
+	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-2.jpg")
+	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-3.mp4")
 }

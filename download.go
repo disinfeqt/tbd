@@ -53,21 +53,30 @@ func saveTweet(tweet *twitterscraper.Tweet, cfg Config) error {
 	return nil
 }
 
-func downloadPhotos(tweet *twitterscraper.Tweet, cfg Config) error {
+func downloadMedia(tweet *twitterscraper.Tweet, cfg Config) error {
 	var errors []error
-	photosCount := len(tweet.Photos)
+	mediaCount := len(tweet.OrderedMedia)
 
-	if photosCount > 0 {
-		for i, photo := range tweet.Photos {
-			urlStr := photo.URL + "?name=orig"
+	if mediaCount > 0 {
+		for i, media := range tweet.OrderedMedia {
+			parsedURL, err := url.Parse(media.URL)
+			if err != nil {
+				errors = append(errors, eris.Wrap(err, "failed to parse media URL"))
+			}
 
-			filename, err := buildTweetMediaFilename(urlStr, i, photosCount, tweet)
+			if media.Type == twitterscraper.MediaTypePhoto {
+				params := parsedURL.Query()
+				params.Set("name", "orig")
+				parsedURL.RawQuery = params.Encode()
+			}
+
+			filename, err := buildTweetMediaFilename(parsedURL, i, mediaCount, tweet)
 			if err != nil {
 				errors = append(errors, err)
 				continue
 			}
 
-			if err := downloadFile(urlStr, filename, tweet, cfg); err != nil {
+			if err := downloadFile(parsedURL.String(), filename, tweet, cfg); err != nil {
 				errors = append(errors, err)
 			}
 		}
@@ -80,14 +89,9 @@ func downloadPhotos(tweet *twitterscraper.Tweet, cfg Config) error {
 	return nil
 }
 
-func buildTweetMediaFilename(urlStr string, index int, total int, tweet *twitterscraper.Tweet) (string, error) {
+func buildTweetMediaFilename(url *url.URL, index int, total int, tweet *twitterscraper.Tweet) (string, error) {
 	// Get the file extension (keep as is)
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return "", eris.Wrap(err, "failed to parse URL")
-	}
-
-	fileExt := strings.ToLower(path.Ext(parsedURL.Path))
+	fileExt := strings.ToLower(path.Ext(url.Path))
 
 	var filename string
 
