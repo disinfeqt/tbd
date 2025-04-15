@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -70,7 +69,7 @@ func parseCookie() ([]*http.Cookie, error) {
 		case "no_restriction":
 			cookie.SameSite = http.SameSiteNoneMode
 		default:
-			fmt.Printf("Warning: Unknown SameSite value '%s', defaulting to SameSiteDefaultMode\n", jc.SameSite)
+			PrintWarningF("Unknown SameSite value '%s', defaulting to SameSiteDefaultMode\n", jc.SameSite)
 			cookie.SameSite = http.SameSiteDefaultMode
 		}
 		cookies = append(cookies, cookie)

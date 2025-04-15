@@ -53,7 +53,7 @@ func main() {
 			continue // Continue process next bookmark
 		}
 
-		PrintInfoF("Processing Tweet: %s\n", tweet.ID)
+		PrintInfoF("Processing Tweet: %s", tweet.ID)
 
 		err := saveTweet(&tweet.Tweet, config)
 		if err != nil {
@@ -68,7 +68,7 @@ func main() {
 		processedBookmarksCount += 1
 	}
 
-	PrintInfoF("Successfully processed %d bookmarks\n", processedBookmarksCount)
+	PrintInfoF("Successfully processed %d bookmarks", processedBookmarksCount)
 }
 
 func initScraper() *twitterscraper.Scraper {

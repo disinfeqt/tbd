@@ -51,13 +51,19 @@ func PrintError(err error) {
 	logToFile("[ERROR]", errMsg)
 }
 
-func PrintWarning(message ...interface{}) {
+func PrintWarning(message ...any) {
 	msg := fmt.Sprint(message...)
 	fmt.Println(warningColor.Sprint("[WARN]"), msg)
 	logToFile("[WARN]", msg)
 }
 
-func PrintInfo(message ...interface{}) {
+func PrintWarningF(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Println(warningColor.Sprint("[WARN]"), msg)
+	logToFile("[WARN]", msg)
+}
+
+func PrintInfo(message ...any) {
 	msg := fmt.Sprint(message...)
 	fmt.Println(infoColor.Sprint("[INFO]"), msg)
 	logToFile("[INFO]", msg)
@@ -65,7 +71,7 @@ func PrintInfo(message ...interface{}) {
 
 func PrintInfoF(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Print(infoColor.Sprint("[INFO]"), msg)
+	fmt.Println(infoColor.Sprint("[INFO]"), msg)
 	logToFile("[INFO]", msg)
 }
 

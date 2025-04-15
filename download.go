@@ -49,7 +49,7 @@ func saveTweet(tweet *twitterscraper.Tweet, cfg Config) error {
 		return eris.Wrap(err, "failed to set modified time")
 	}
 
-	PrintInfoF("  Saved: %s\n", outputPath)
+	PrintInfoF("  Saved: %s", outputPath)
 	return nil
 }
 
@@ -126,7 +126,7 @@ func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, c
 
 		if resp.ContentLength > 0 {
 			if fileInfo.Size() == resp.ContentLength {
-				PrintInfoF("  Skipped: %s\n", outputPath)
+				PrintInfoF("  Skipped: %s", outputPath)
 				return nil
 			}
 		}
@@ -170,6 +170,6 @@ func downloadFile(urlStr string, filename string, tweet *twitterscraper.Tweet, c
 		return eris.Wrap(err, "failed to set modified time")
 	}
 
-	PrintInfoF("  Downloaded: %s\n", outputPath)
+	PrintInfoF("  Downloaded: %s", outputPath)
 	return nil
 }
