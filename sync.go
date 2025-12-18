@@ -1,18 +1,26 @@
 package main
 
 import (
+	"encoding/json"
 	"time"
 )
 
 const DUPLICATE_THRESHOLD = 5 // Stop if 5 duplicates found in a row
 
-func ProcessSync(inputTweets []InputTweet) SyncResponse {
+func ProcessSync(rawMessages []json.RawMessage) SyncResponse {
 	savedCount := 0
 	duplicateStreak := 0
 	stopRequired := false
 
-	for _, it := range inputTweets {
-		// Check if exists
+	for _, msg := range rawMessages {
+		// 1. 解析核心字段用于排重和模型填充
+		var it InputTweet
+		if err := json.Unmarshal(msg, &it); err != nil {
+			PrintError(err)
+			continue
+		}
+
+		// 2. 检查是否已存在
 		var exists int64
 		DB.Model(&TweetModel{}).Where("id = ?", it.ID).Count(&exists)
 
@@ -28,8 +36,8 @@ func ProcessSync(inputTweets []InputTweet) SyncResponse {
 		// Reset streak on new tweet
 		duplicateStreak = 0
 
-		// Convert and Save
-		model := convertInputToModel(it)
+		// 3. 转换并保存，直接将原始字节转为 string 存入 RawJSON
+		model := convertInputToModel(it, string(msg))
 		if err := DB.Create(model).Error; err != nil {
 			PrintError(err)
 			continue
@@ -46,7 +54,7 @@ func ProcessSync(inputTweets []InputTweet) SyncResponse {
 	}
 }
 
-func convertInputToModel(it InputTweet) *TweetModel {
+func convertInputToModel(it InputTweet, rawJSON string) *TweetModel {
 	tm := &TweetModel{
 		ID:           it.ID,
 		FullText:     it.FullText,
@@ -54,6 +62,7 @@ func convertInputToModel(it InputTweet) *TweetModel {
 		ScreenName:   it.ScreenName,
 		CreatedAt:    time.Unix(it.CreatedAt, 0),
 		PermanentURL: it.PermanentURL,
+		RawJSON:      rawJSON, // 完美拿到原始 JSON，无冗余发送
 		SyncedAt:     time.Now(),
 	}
 

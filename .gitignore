@@ -1,4 +1,22 @@
+# Data directories
+tweets/
+media/
+extra/
+
+# Database
+*.db
+*.db-journal
+
+# Logs and Temp files
+logs/
+*.log
+*.pid
+main.go.bak
+test_payload.json
+
+# Binaries
+downloader
 twitter-bookmarks-downloader
-x.com_cookies.json
+
+# System
 .DS_Store
-assets

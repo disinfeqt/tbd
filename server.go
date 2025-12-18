@@ -7,25 +7,21 @@ import (
 	"github.com/rotisserie/eris"
 )
 
-// InputTweet represents the simplified JSON structure sent from the Userscript
+// InputTweet represents the simplified JSON structure for indexing
 type InputTweet struct {
 	ID           string       `json:"id_str"`
 	FullText     string       `json:"full_text"`
-	UserID       string       `json:"user_id_str"`
 	Name         string       `json:"name"`
 	ScreenName   string       `json:"screen_name"`
-	CreatedAt    int64        `json:"created_at"` // Unix timestamp or string, let's assume int64 for now
+	CreatedAt    int64        `json:"created_at"` // Unix timestamp
 	PermanentURL string       `json:"permanent_url"`
-	IsRetweet    bool         `json:"is_retweet"`
 	Media        []InputMedia `json:"media"`
-	RawJSON      string       `json:"-"`
 }
 
 type InputMedia struct {
-	ID      string `json:"id_str"`
-	Type    string `json:"type"` // photo, video, animated_gif
-	URL     string `json:"media_url_https"`
-	Preview string `json:"preview_url"` // Not in DB model but useful for UI potentially
+	ID   string `json:"id_str"`
+	Type string `json:"type"` // photo, video, animated_gif
+	URL  string `json:"media_url_https"`
 }
 
 type SyncResponse struct {
@@ -38,7 +34,6 @@ type SyncResponse struct {
 func StartServer() {
 	// Enable CORS for Userscript
 	http.HandleFunc("/api/sync", func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
 		w.Header().Set("Access-Control-Allow-Origin", "https://x.com")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -63,13 +58,14 @@ func handleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var inputTweets []InputTweet
-	if err := json.NewDecoder(r.Body).Decode(&inputTweets); err != nil {
+	// 核心优化：接收原始 JSON 消息片段数组
+	var rawMessages []json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&rawMessages); err != nil {
 		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	response := ProcessSync(inputTweets)
+	response := ProcessSync(rawMessages)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
