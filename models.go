@@ -29,6 +29,7 @@ func (TweetModel) TableName() string {
 type MediaModel struct {
 	ID      string `gorm:"primaryKey" json:"id_str"`
 	TweetID string `gorm:"index" json:"tweet_id"`
+	Index   int    `gorm:"default:0" json:"index"` // Original order in tweet
 	URL     string `json:"media_url_https"`
 	Type    string `json:"type"` // photo, video, animated_gif
 

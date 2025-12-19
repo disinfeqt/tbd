@@ -70,19 +70,11 @@ func processMediaDownload(media *MediaModel) error {
 		parsedURL.RawQuery = params.Encode()
 	}
 
-	// 加载所有媒体以确定 index
-	var allMedia []MediaModel
-	DB.Where("tweet_id = ?", tweet.ID).Order("id asc").Find(&allMedia)
+	// Determine total media count for this tweet
+	var mediaCount int64
+	DB.Model(&MediaModel{}).Where("tweet_id = ?", tweet.ID).Count(&mediaCount)
 
-	index := 0
-	for i, m := range allMedia {
-		if m.ID == media.ID {
-			index = i
-			break
-		}
-	}
-
-	filename := buildFilename(&tweet, index, len(allMedia), parsedURL)
+	filename := buildFilename(&tweet, media.Index, int(mediaCount), parsedURL)
 	outputPath := path.Join(config.MediaDir, filename)
 
 	if err := downloadFile(parsedURL.String(), outputPath, tweet.CreatedAt); err != nil {

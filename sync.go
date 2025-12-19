@@ -215,10 +215,11 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			SyncedAt:     time.Now(),
 		}
 
-		for _, m := range tweet.Legacy.ExtendedEntities.Media {
+		for i, m := range tweet.Legacy.ExtendedEntities.Media {
 			tm.Media = append(tm.Media, MediaModel{
 				ID:      m.IDStr,
 				TweetID: tweetID,
+				Index:   i,
 				Type:    m.Type,
 				URL:     m.MediaURLHttps,
 			})
