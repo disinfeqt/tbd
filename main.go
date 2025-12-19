@@ -1,10 +1,15 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/rotisserie/eris"
 )
 
 func main() {
+	importLegacy := flag.Bool("import-legacy", false, "Import legacy JSON files from tweets/ directory")
+	flag.Parse()
+
 	// 1. Initialize Logger
 	err := InitLogger("logs")
 	if err != nil {
@@ -18,6 +23,14 @@ func main() {
 		FatalError(eris.Wrap(err, "Failed to init DB"))
 	}
 	PrintInfo("Database initialized successfully")
+
+	// Special Mode: Import Legacy Data
+	if *importLegacy {
+		if err := ImportLegacyData("tweets"); err != nil {
+			FatalError(err)
+		}
+		return // Exit after import
+	}
 
 	// 3. Start Background Download Worker
 	go StartDownloadWorker()

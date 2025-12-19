@@ -66,7 +66,7 @@ func DownloadPendingMedia() {
 	for _, media := range mediaList {
 		err := processMediaDownload(&media)
 		if err != nil {
-			PrintError(eris.Wrapf(err, "Failed to download media %s", media.ID))
+			PrintError(eris.Wrapf(err, "Media ID: %s", media.ID))
 			media.RetryCount++
 			if media.RetryCount >= 3 {
 				media.Failed = true
@@ -108,7 +108,7 @@ func processMediaDownload(media *MediaModel) error {
 	outputPath := path.Join(config.MediaDir, filename)
 
 	if err := downloadFile(parsedURL.String(), outputPath, tweet.CreatedAt); err != nil {
-		return err
+		return eris.Wrapf(err, "URL: %s (from Tweet: %s)", media.URL, tweet.PermanentURL)
 	}
 
 	return nil
