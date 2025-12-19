@@ -34,6 +34,7 @@ This project uses a hybrid architecture to safely and reliably sync Twitter book
   - The `result` field often contains a `__typename` wrapper.
   - **Strategy**: We use a comprehensive struct matching the observed `@d.json` schema.
 - **Regex Fallback**: Parsing structure often fails due to API changes or suspended users. We use a Regex (`"screen_name"\s*:\s*"([^"]+)"`) as a last line of defense to extract the username. **This is critical for correct file naming.**
+- **RawJSON Preservation**: We store the complete, original JSON payload in the `raw_json` column of the `tweets` table. This serves as the **single source of truth** for future data recovery, re-parsing (if logic changes), and regression testing.
 - **Deduplication**: Sync stops (sets `duplicate_limit_reached`) if 5 consecutive existing tweets are encountered.
 
 ### File Naming Convention
@@ -44,17 +45,26 @@ Strictly adhere to the legacy format to avoid re-downloading existing libraries:
 ## 3. Configuration
 
 - **Port**: `41008` (Hardcoded in `main.go` and Userscript).
-*   **Database**: `bookmarks.db` (SQLite).
-*   **Storage Migration**: Historically, bookmarks were saved as individual JSON files in `tweets/`. This feature has been **deprecated** in favor of full DB persistence (storing the raw payload in the `raw_json` column).
-*   **Directories**: `media/` (images/videos). The `tweets/` directory is no longer used for new bookmarks.
+- **Database**: `bookmarks.db` (SQLite).
+- **Storage Migration**: Historically, bookmarks were saved as individual JSON files in `tweets/`. This feature has been **deprecated** in favor of full DB persistence (storing the raw payload in the `raw_json` column).
+- **Directories**: `media/` (images/videos). The `tweets/` directory is no longer used for new bookmarks.
 
 ## 4. Development Workflow
+
+### Task Management
+
+- **TODO.taskpaper**: We use a `TODO.taskpaper` file in the root directory to track current tasks, future ideas, and backlog items. This file serves as the shared memory for project planning.
 
 ### Rules
 
 - **No Proactive Commits**: Do not commit code unless explicitly instructed.
 - **Format**: Run `go fmt ./...` before every commit.
 - **Commit Messages**: Simple, descriptive, non-conventional. Always include `Co-authored-by: Gemini <gemini@google.com>`.
+
+### Testing Strategy
+
+- **Unit Tests (`download_test.go`)**: Focus on pure logic (e.g., filename generation) using mocked data. Avoid external network dependencies.
+- **Regression Tests**: For complex parsing scenarios (e.g., Mixed Media), use saved `RawJSON` snapshots from the database as test cases.
 
 ### Common Commands
 
