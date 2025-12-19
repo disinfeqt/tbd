@@ -99,7 +99,7 @@ func buildFilename(tweet *TweetModel, index int, total int, url *url.URL) string
 func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 	if _, err := os.Stat(config.MediaDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(config.MediaDir, 0755); err != nil {
-			return err
+			return eris.Wrap(err, "failed to create media directory")
 		}
 	}
 
@@ -121,17 +121,17 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 
 	resp, err := http.Get(urlStr)
 	if err != nil {
-		return err
+		return eris.Wrap(err, "failed to download file from URL")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("status code %d", resp.StatusCode)
+		return eris.Errorf("failed to download file, status code: %d", resp.StatusCode)
 	}
 
 	out, err := os.Create(outputPath)
 	if err != nil {
-		return err
+		return eris.Wrap(err, "failed to create local file")
 	}
 
 	written, copyErr := io.Copy(out, resp.Body)
@@ -140,24 +140,24 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 	closeErr := out.Close()
 
 	if copyErr != nil {
-		return copyErr
+		return eris.Wrap(copyErr, "failed to copy content to local file")
 	}
 	if closeErr != nil {
-		return closeErr
+		return eris.Wrap(closeErr, "failed to close local file")
 	}
 
 	// Verify download completeness
 	if resp.ContentLength > 0 {
 		if written != resp.ContentLength {
-			return fmt.Errorf("download incomplete, expected %d bytes, got %d bytes", resp.ContentLength, written)
+			return eris.Errorf("download incomplete, expected %d bytes, got %d bytes", resp.ContentLength, written)
 		}
 	} else {
 		PrintWarning("Content-Length header not provided by the server.")
 	}
 
-	// Only modify time if download and write were successful
+	// Restore strict error check for Chtimes as per legacy code
 	if err := os.Chtimes(outputPath, time.Now(), modTime); err != nil {
-		PrintWarningF("Failed to set modtime for %s: %v", outputPath, err)
+		return eris.Wrap(err, "failed to set modified time")
 	}
 	
 	PrintInfoF("  Downloaded: %s", outputPath)
