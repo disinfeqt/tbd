@@ -34,7 +34,9 @@ This project uses a hybrid architecture to safely and reliably sync Twitter book
   - The `result` field often contains a `__typename` wrapper.
   - **Strategy**: We use a comprehensive struct matching the observed `@d.json` schema.
 - **Regex Fallback**: Parsing structure often fails due to API changes or suspended users. We use a Regex (`"screen_name"\s*:\s*"([^"]+)"`) as a last line of defense to extract the username. **This is critical for correct file naming.**
-- **RawJSON Preservation**: We store the complete, original JSON payload in the `raw_json` column of the `tweets` table. This serves as the **single source of truth** for future data recovery, re-parsing (if logic changes), and regression testing.
+*   **RawJSON Preservation**: We store the complete, original JSON payload in the `raw_json` column of the `tweets` table. This serves as the **single source of truth** for future data recovery and re-parsing.
+    *   **Heterogeneity Note**: After the legacy data import, `raw_json` may contain two distinct formats: the official Twitter GraphQL response (new data) and the `twitter-scraper` format (legacy data).
+    *   **Parsing Policy**: Business logic (downloader, worker) must rely on **normalized fields** (e.g., `TweetModel.ID`, `MediaModel.URL`) rather than `RawJSON`. If re-parsing `RawJSON` is needed, use structural detection (e.g., checking for the presence of `"OrderedMedia"`) to determine the format.
 - **Deduplication**: Sync stops (sets `duplicate_limit_reached`) if 5 consecutive existing tweets are encountered.
 
 ### File Naming Convention
@@ -52,8 +54,10 @@ Strictly adhere to the legacy format to avoid re-downloading existing libraries:
 ## 4. Development Workflow
 
 ### Task Management
+*   **Conductor**: We use the Conductor extension for project planning and track management. 
+    *   `conductor/tracks.md`: Index of active development tracks.
+    *   `conductor/tracks/<track-id>/plan.md`: Detailed plan and status for a specific task.
 
-- **TODO.taskpaper**: We use a `TODO.taskpaper` file in the root directory to track current tasks, future ideas, and backlog items. This file serves as the shared memory for project planning.
 
 ### Rules
 
@@ -67,10 +71,10 @@ Strictly adhere to the legacy format to avoid re-downloading existing libraries:
 - **Regression Tests**: For complex parsing scenarios (e.g., Mixed Media), use saved `RawJSON` snapshots from the database as test cases.
 
 ### Common Commands
-
-- **Run**: `go run .`
-- **Build**: `go build .`
-- **Test Userscript**: Update the version in `sync-bookmarks.user.js` and reinstall in Tampermonkey.
+*   **Run**: `go run .`
+*   **Build**: `go build .`
+*   **Import Legacy Data**: `./twitter-bookmarks-downloader --import-legacy` (scans `tweets/` directory)
+*   **Test Userscript**: Update the version in `sync-bookmarks.user.js` and reinstall in Tampermonkey.
 
 ## 5. Troubleshooting
 
