@@ -44,8 +44,9 @@ Strictly adhere to the legacy format to avoid re-downloading existing libraries:
 ## 3. Configuration
 
 - **Port**: `41008` (Hardcoded in `main.go` and Userscript).
-- **Database**: `bookmarks.db` (SQLite).
-- **Directories**: `media/` (images/videos), `tweets/` (legacy JSONs, currently unused but preserved).
+*   **Database**: `bookmarks.db` (SQLite).
+*   **Storage Migration**: Historically, bookmarks were saved as individual JSON files in `tweets/`. This feature has been **deprecated** in favor of full DB persistence (storing the raw payload in the `raw_json` column).
+*   **Directories**: `media/` (images/videos). The `tweets/` directory is no longer used for new bookmarks.
 
 ## 4. Development Workflow
 

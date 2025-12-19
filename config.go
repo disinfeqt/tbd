@@ -6,17 +6,13 @@ import (
 )
 
 type Config struct {
-	MediaDir          string
-	TweetsDir         string
-	MaxBookmarksCount int
+	MediaDir string
 }
 
 var isReleaseBuild bool
 
 var config Config = Config{
-	MediaDir:          "media",
-	TweetsDir:         "tweets",
-	MaxBookmarksCount: 100000,
+	MediaDir: "media",
 }
 
 func init() {
