@@ -16,11 +16,8 @@ import (
 func StartDownloadWorker() {
 	PrintInfo("Download worker started")
 	ticker := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			DownloadPendingMedia()
-		}
+	for range ticker.C {
+		DownloadPendingMedia()
 	}
 }
 
@@ -106,16 +103,20 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 		}
 	}
 
-	// 增强：像原版一样校验文件大小
+	// 像原版一样校验文件大小
 	if fileInfo, err := os.Stat(outputPath); err == nil {
 		resp, err := http.Head(urlStr)
-		if err == nil && resp.ContentLength > 0 {
-			if fileInfo.Size() == resp.ContentLength {
-				PrintInfoF("  Skipped: %s", outputPath)
-				return nil
+		if err != nil {
+			PrintWarning("Failed to check remote file size, force downloading")
+		} else {
+			if resp.ContentLength > 0 {
+				if fileInfo.Size() == resp.ContentLength {
+					PrintInfoF("  Skipped: %s", outputPath)
+					return nil
+				}
 			}
+			resp.Body.Close()
 		}
-		// 如果大小不一致或 Head 失败，继续下载（覆盖）
 	}
 
 	resp, err := http.Get(urlStr)
@@ -132,14 +133,33 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return err
+	written, copyErr := io.Copy(out, resp.Body)
+	
+	// Explicitly close file to ensure flush and release lock
+	closeErr := out.Close()
+
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeErr != nil {
+		return closeErr
 	}
 
-	os.Chtimes(outputPath, time.Now(), modTime)
+	// Verify download completeness
+	if resp.ContentLength > 0 {
+		if written != resp.ContentLength {
+			return fmt.Errorf("download incomplete, expected %d bytes, got %d bytes", resp.ContentLength, written)
+		}
+	} else {
+		PrintWarning("Content-Length header not provided by the server.")
+	}
+
+	// Only modify time if download and write were successful
+	if err := os.Chtimes(outputPath, time.Now(), modTime); err != nil {
+		PrintWarningF("Failed to set modtime for %s: %v", outputPath, err)
+	}
+	
 	PrintInfoF("  Downloaded: %s", outputPath)
 	return nil
 }
