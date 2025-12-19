@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"net/url"
 	"regexp"
 	"time"
 )
@@ -120,6 +121,13 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 	duplicateStreak := 0
 	duplicateLimitReached := false
 
+	// Debug info for sparse saves
+	type savedInfo struct {
+		URL        string
+		MediaFiles []string
+	}
+	var savedDebug []savedInfo
+
 	for _, res := range results {
 		// 1. Parse minimal fields required for indexing using a comprehensive struct matching common patterns.
 		var tweet struct {
@@ -166,7 +174,6 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		if screenName == "" {
 			screenName = tweet.Core.UserResults.Result.Core.ScreenName
 		}
-
 		name := tweet.Core.UserResults.Result.Legacy.Name
 		if name == "" {
 			name = tweet.Core.UserResults.Result.Core.Name
@@ -202,7 +209,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			createdAt = time.Now()
 		}
 
-		// 5. Construct the TweetModel.
+		// 5. Construct the TweetModel and MediaModels
 		// Note: We store the raw JSON payload to allow for future re-processing or data recovery.
 		tm := &TweetModel{
 			ID:           tweetID,
@@ -215,6 +222,8 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			SyncedAt:     time.Now(),
 		}
 
+		var mediaFilenames []string
+		mediaCount := len(tweet.Legacy.ExtendedEntities.Media)
 		for i, m := range tweet.Legacy.ExtendedEntities.Media {
 			tm.Media = append(tm.Media, MediaModel{
 				ID:      m.IDStr,
@@ -223,14 +232,33 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 				Type:    m.Type,
 				URL:     m.MediaURLHttps,
 			})
+
+			// Generate simulated filename for debug
+			if parsedURL, err := url.Parse(m.MediaURLHttps); err == nil {
+				mediaFilenames = append(mediaFilenames, buildFilename(tm, i, mediaCount, parsedURL))
+			}
 		}
 
 		if err := DB.Create(tm).Error; err == nil {
 			savedCount++
+			savedDebug = append(savedDebug, savedInfo{
+				URL:        tm.PermanentURL,
+				MediaFiles: mediaFilenames,
+			})
 		}
 	}
 
 	PrintInfoF("Batch processing complete: %d new tweets saved. (Duplicate limit reached: %v)", savedCount, duplicateLimitReached)
+
+	// Debug: Identify why we are saving items after hitting duplicate limit
+	if duplicateLimitReached && savedCount > 0 {
+		for _, info := range savedDebug {
+			PrintWarningF("  [Sparse Save] URL: %s", info.URL)
+			for _, mf := range info.MediaFiles {
+				PrintWarningF("                Media: %s", mf)
+			}
+		}
+	}
 
 	return SyncResponse{
 		Success:               true,
