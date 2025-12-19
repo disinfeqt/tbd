@@ -15,7 +15,7 @@ import (
 
 func StartDownloadWorker() {
 	PrintInfo("Download worker started")
-	
+
 	// Initial report on startup (force display)
 	ReportWorkerStatus(true)
 
@@ -35,8 +35,12 @@ func StartDownloadWorker() {
 func ReportWorkerStatus(force bool) {
 	var pending int64
 	var failed int64
-	DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&pending)
-	DB.Model(&MediaModel{}).Where("failed = ?", true).Count(&failed)
+	if err := DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&pending).Error; err != nil {
+		PrintError(eris.Wrap(err, "Failed to count pending media"))
+	}
+	if err := DB.Model(&MediaModel{}).Where("failed = ?", true).Count(&failed).Error; err != nil {
+		PrintError(eris.Wrap(err, "Failed to count failed media"))
+	}
 
 	if force || pending > 0 || failed > 0 {
 		PrintInfoF("[Worker Status] Pending: %d | Failed: %d", pending, failed)
@@ -70,7 +74,9 @@ func DownloadPendingMedia() {
 		} else {
 			media.Downloaded = true
 		}
-		DB.Save(&media)
+		if err := DB.Save(&media).Error; err != nil {
+			PrintError(eris.Wrapf(err, "Failed to update media status for %s", media.ID))
+		}
 	}
 }
 
@@ -94,7 +100,9 @@ func processMediaDownload(media *MediaModel) error {
 
 	// Determine total media count for this tweet
 	var mediaCount int64
-	DB.Model(&MediaModel{}).Where("tweet_id = ?", tweet.ID).Count(&mediaCount)
+	if err := DB.Model(&MediaModel{}).Where("tweet_id = ?", tweet.ID).Count(&mediaCount).Error; err != nil {
+		return eris.Wrap(err, "Failed to count tweet media")
+	}
 
 	filename := buildFilename(&tweet, media.Index, int(mediaCount), parsedURL)
 	outputPath := path.Join(config.MediaDir, filename)
@@ -136,11 +144,16 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 		} else {
 			if resp.ContentLength > 0 {
 				if fileInfo.Size() == resp.ContentLength {
+					if err := resp.Body.Close(); err != nil {
+						PrintWarningF("Failed to close HEAD response body: %v", err)
+					}
 					PrintInfoF("  Skipped: %s", outputPath)
 					return nil
 				}
 			}
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				PrintWarningF("Failed to close HEAD response body: %v", err)
+			}
 		}
 	}
 
@@ -148,7 +161,11 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 	if err != nil {
 		return eris.Wrap(err, "failed to download file from URL")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			PrintWarningF("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return eris.Errorf("failed to download file, status code: %d", resp.StatusCode)
