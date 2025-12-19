@@ -23,5 +23,7 @@ func main() {
 	go StartDownloadWorker()
 
 	// 4. Start HTTP Server
-	StartServer()
+	if err := StartServer(":41008"); err != nil {
+		FatalError(eris.Wrap(err, "Server failed"))
+	}
 }
