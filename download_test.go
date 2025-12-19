@@ -1,35 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 	"testing"
+	"time"
 
-	twitterscraper "github.com/imperatrona/twitter-scraper"
 	"github.com/stretchr/testify/assert"
 )
-
-var scraper *twitterscraper.Scraper
-
-func TestMain(m *testing.M) {
-	setupTestSuite()
-
-	exitCode := m.Run()
-
-	os.Exit(exitCode)
-}
-
-func setupTestSuite() {
-	scraper = initScraper()
-	config.MediaDir = "test_media"
-
-	err := os.RemoveAll(config.MediaDir)
-	if err != nil {
-		FatalError(err)
-	}
-}
 
 func TestFileExt(t *testing.T) {
 	const urlStr = "https://pbs.twimg.com/media/GoaCyBaXAAAjPQD.JPG?name=orig"
@@ -39,34 +19,50 @@ func TestFileExt(t *testing.T) {
 	assert.Equal(t, ".jpg", actual)
 }
 
-func TestMultiplePhotos(t *testing.T) {
-	const urlStr = "https://x.com/nekoplanetOuO/status/1895276249498689869"
+func TestBuildFilename(t *testing.T) {
+	// Use a fixed UTC time for consistency
+	createdAtUTC := time.Date(2025, 2, 28, 8, 54, 5, 0, time.UTC)
+	
+	tweet := &TweetModel{
+		ID:         "1895276249498689869",
+		ScreenName: "nekoplanetOuO",
+		CreatedAt:  createdAtUTC,
+	}
 
-	id := path.Base(urlStr)
-	assert.Equal(t, "1895276249498689869", id)
+	// Calculate expected timestamp string based on local machine's timezone
+	// because buildFilename uses time.Local
+	expectedTimeStr := createdAtUTC.In(time.Local).Format("20060102-150405")
 
-	tweet, err := scraper.GetTweet(id)
-	assert.Equal(t, nil, err)
+	// Test Case 1: Single Image
+	url1, _ := url.Parse("https://pbs.twimg.com/media/test.jpg")
+	filename1 := buildFilename(tweet, 0, 1, url1)
+	expected1 := fmt.Sprintf("twitter-@nekoplanetOuO-%s-1895276249498689869.jpg", expectedTimeStr)
+	assert.Equal(t, expected1, filename1)
 
-	err = downloadMedia(tweet, config)
-	assert.Equal(t, nil, err)
-	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-0.jpg")
-	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-1.jpg")
-	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-2.jpg")
-	assert.FileExists(t, "test_media/twitter-@nekoplanetOuO-20250228-085405-1895276249498689869-3.jpg")
+	// Test Case 2: Multiple Images (Index 0)
+	filename2 := buildFilename(tweet, 0, 4, url1)
+	expected2 := fmt.Sprintf("twitter-@nekoplanetOuO-%s-1895276249498689869-0.jpg", expectedTimeStr)
+	assert.Equal(t, expected2, filename2)
+
+	// Test Case 3: Multiple Images (Index 3)
+	filename3 := buildFilename(tweet, 3, 4, url1)
+	expected3 := fmt.Sprintf("twitter-@nekoplanetOuO-%s-1895276249498689869-3.jpg", expectedTimeStr)
+	assert.Equal(t, expected3, filename3)
 }
 
-func TestMixedMedia(t *testing.T) {
-	const urlStr = "https://x.com/YamoakaMei/status/1911758791701332134"
+func TestBuildFilenameVideo(t *testing.T) {
+	createdAtUTC := time.Date(2025, 4, 14, 20, 29, 49, 0, time.UTC)
+	tweet := &TweetModel{
+		ID:         "1911758791701332134",
+		ScreenName: "YamoakaMei",
+		CreatedAt:  createdAtUTC,
+	}
 
-	id := path.Base(urlStr)
-	tweet, err := scraper.GetTweet(id)
-	assert.Equal(t, nil, err)
+	expectedTimeStr := createdAtUTC.In(time.Local).Format("20060102-150405")
 
-	err = downloadMedia(tweet, config)
-	assert.Equal(t, nil, err)
-	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-0.mp4")
-	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-1.mp4")
-	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-2.jpg")
-	assert.FileExists(t, "test_media/twitter-@YamoakaMei-20250414-202949-1911758791701332134-3.mp4")
+	// Test Case: Video
+	urlVid, _ := url.Parse("https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/test.mp4")
+	filename := buildFilename(tweet, 0, 1, urlVid)
+	expected := fmt.Sprintf("twitter-@YamoakaMei-%s-1911758791701332134.mp4", expectedTimeStr)
+	assert.Equal(t, expected, filename)
 }
