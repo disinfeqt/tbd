@@ -15,9 +15,34 @@ import (
 
 func StartDownloadWorker() {
 	PrintInfo("Download worker started")
+	
+	// Initial report on startup (force display)
+	ReportWorkerStatus(true)
+
 	ticker := time.NewTicker(5 * time.Second)
-	for range ticker.C {
-		DownloadPendingMedia()
+	statusTicker := time.NewTicker(10 * time.Minute)
+
+	for {
+		select {
+		case <-ticker.C:
+			DownloadPendingMedia()
+		case <-statusTicker.C:
+			ReportWorkerStatus(false)
+		}
+	}
+}
+
+func ReportWorkerStatus(force bool) {
+	var pending int64
+	var failed int64
+	DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&pending)
+	DB.Model(&MediaModel{}).Where("failed = ?", true).Count(&failed)
+
+	if force || pending > 0 || failed > 0 {
+		PrintInfoF("[Worker Status] Pending: %d | Failed: %d", pending, failed)
+		if failed > 0 {
+			PrintWarningF("  %d media items failed permanently after multiple retries.", failed)
+		}
 	}
 }
 
@@ -98,7 +123,7 @@ func buildFilename(tweet *TweetModel, index int, total int, url *url.URL) string
 
 func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 	if _, err := os.Stat(config.MediaDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(config.MediaDir, 0755); err != nil {
+		if err := os.MkdirAll(config.MediaDir, 0o755); err != nil {
 			return eris.Wrap(err, "failed to create media directory")
 		}
 	}
@@ -135,7 +160,7 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 	}
 
 	written, copyErr := io.Copy(out, resp.Body)
-	
+
 	// Explicitly close file to ensure flush and release lock
 	closeErr := out.Close()
 
@@ -159,7 +184,7 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time) error {
 	if err := os.Chtimes(outputPath, time.Now(), modTime); err != nil {
 		return eris.Wrap(err, "failed to set modified time")
 	}
-	
+
 	PrintInfoF("  Downloaded: %s", outputPath)
 	return nil
 }
