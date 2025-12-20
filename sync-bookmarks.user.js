@@ -15,7 +15,7 @@
   'use strict'
   const RAW_SYNC_URL = 'http://localhost:41008/api/sync-raw'
 
-  console.log('[TBD v0.2] Minimal UI Edition loaded.')
+  console.log('[TBD v0.2] Terminal UI Edition loaded.')
 
   const UI = {
     el: null,
@@ -29,48 +29,48 @@
       this.el = document.createElement('div')
       this.el.style.cssText = `
                 position: fixed;
-                bottom: 100px;
+                bottom: 80px;
                 left: 20px;
-                background: rgba(0, 0, 0, 0.7);
-                color: #eee;
-                padding: 8px 12px;
-                border-radius: 8px;
-                font-family: monospace;
-                font-size: 11px;
+                background: #000;
+                color: #0f0;
+                padding: 10px 14px;
+                border-radius: 4px;
+                font-family: "Consolas", "Monaco", "Courier New", monospace;
+                font-size: 12px;
                 z-index: 999999;
-                backdrop-filter: blur(4px);
-                border: 1px solid rgba(255,255,255,0.1);
+                border: 1px solid #333;
+                box-shadow: 0 0 10px rgba(0, 255, 0, 0.1);
                 display: flex;
                 flex-direction: column;
-                gap: 6px;
-                min-width: 200px;
+                gap: 8px;
+                min-width: 130px;
                 user-select: none;
+                letter-spacing: 0.5px;
             `
 
       const controls = document.createElement('div')
       controls.style.cssText =
-        'display: flex; justify-content: space-between; align-items: center; gap: 10px;'
+        'display: flex; justify-content: space-between; align-items: center; gap: 12px;'
 
       this.btn = document.createElement('div')
-      this.btn.innerText = '▶'
+      this.btn.innerText = '[RUN]'
       this.btn.style.cssText =
-        'cursor: pointer; font-size: 16px; color: #1d9bf0; transition: color 0.2s;'
+        'cursor: pointer; font-weight: bold; color: #0f0; text-shadow: 0 0 2px rgba(0,255,0,0.5);'
       this.btn.onclick = () => Scroller.toggle()
 
       this.forceBtn = document.createElement('div')
-      this.forceBtn.innerText = '∞'
-      this.forceBtn.style.cssText =
-        'cursor: pointer; font-size: 16px; color: #666; transition: color 0.2s;'
-      this.forceBtn.title = 'Force Mode (Ignore Limit)'
+      this.forceBtn.innerText = '[FORCE:OFF]'
+      this.forceBtn.style.cssText = 'cursor: pointer; color: #666; font-size: 10px;'
+      this.forceBtn.title = 'Toggle Force Mode'
       this.forceBtn.onclick = () => this.toggleForce()
 
       controls.appendChild(this.btn)
       controls.appendChild(this.forceBtn)
 
       this.statusEl = document.createElement('div')
-      this.statusEl.innerText = 'TBD Ready'
+      this.statusEl.innerText = '> SYSTEM READY'
       this.statusEl.style.cssText =
-        'text-align: center; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;'
+        'color: #0f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; border-top: 1px dashed #333; padding-top: 6px; font-size: 11px;'
 
       this.el.appendChild(controls)
       this.el.appendChild(this.statusEl)
@@ -93,47 +93,59 @@
       monitor()
     },
 
-    updateStatus(text, color = '#888') {
-      this.statusEl.innerText = text
+    updateStatus(text, color = '#0f0') {
+      this.statusEl.innerText = `> ${text}`
       this.statusEl.style.color = color
 
-      // Auto revert after success/error messages
-      if (color !== '#888') {
+      if (color !== '#0f0' && color !== '#888') {
         if (this.timeout) clearTimeout(this.timeout)
         this.timeout = setTimeout(() => {
           if (Scroller.active) {
-            this.statusEl.innerText = this.isForce ? 'Scrolling (Infinite)' : 'Scrolling (Smart)'
-            this.statusEl.style.color = '#eee'
+            const mode = this.isForce ? 'INFINITE' : 'SMART'
+            this.statusEl.innerText = `> SCROLLING:${mode}`
+            this.statusEl.style.color = '#0ff'
           } else {
-            this.statusEl.innerText = 'TBD Ready'
-            this.statusEl.style.color = '#888'
+            this.statusEl.innerText = '> SYSTEM READY'
+            this.statusEl.style.color = '#0f0'
           }
-        }, 3000)
+        }, 2000)
       }
     },
 
     toggleForce() {
       this.isForce = !this.isForce
-      this.forceBtn.style.color = this.isForce ? '#f4900c' : '#666'
+      this.forceBtn.innerText = this.isForce ? '[FORCE:ON]' : '[FORCE:OFF]'
+      this.forceBtn.style.color = this.isForce ? '#ff9f00' : '#666'
+      this.forceBtn.style.textShadow = this.isForce ? '0 0 2px #ff9f00' : 'none'
+
       if (Scroller.active) {
-        this.statusEl.innerText = this.isForce ? 'Scrolling (Infinite)' : 'Scrolling (Smart)'
+        this.statusEl.innerText = `> SCROLLING:${this.isForce ? 'INFINITE' : 'SMART'}`
       } else {
         this.updateStatus(
-          this.isForce ? 'Force Mode' : 'Smart Mode',
-          this.isForce ? '#f4900c' : '#888'
+          this.isForce ? 'MODE:FORCE' : 'MODE:SMART',
+          this.isForce ? '#ff9f00' : '#888'
         )
       }
     },
 
     setScrolling(isScrolling) {
       if (isScrolling) {
-        this.btn.innerText = '◼'
-        this.btn.style.color = '#f4212e'
-        this.statusEl.innerText = this.isForce ? 'Scrolling (Infinite)' : 'Scrolling (Smart)'
-        this.statusEl.style.color = '#eee'
+        this.btn.innerText = '[STOP]'
+        this.btn.style.color = '#ff0033'
+        this.btn.style.textShadow = '0 0 2px #ff0033'
+
+        const mode = this.isForce ? 'INFINITE' : 'SMART'
+        this.statusEl.innerText = `> SCROLLING:${mode}`
+        this.statusEl.style.color = '#0ff' // Cyan for active state
+        this.el.style.borderColor = '#0ff'
       } else {
-        this.btn.innerText = '▶'
-        this.btn.style.color = '#1d9bf0'
+        this.btn.innerText = '[RUN]'
+        this.btn.style.color = '#0f0'
+        this.btn.style.textShadow = '0 0 2px #0f0'
+
+        this.statusEl.innerText = '> HALTED'
+        this.statusEl.style.color = '#888'
+        this.el.style.borderColor = '#333'
       }
     },
 
@@ -163,7 +175,6 @@
       this.active = false
       clearTimeout(this.timer)
       UI.setScrolling(false)
-      UI.updateStatus('Stopped', '#888')
     },
 
     loop() {
@@ -206,19 +217,20 @@
                 if (res.duplicate_limit_reached) {
                   if (!UI.isForceMode()) {
                     Scroller.stop()
-                    UI.updateStatus('Limit Reached', '#f4212e')
+                    UI.updateStatus('LIMIT REACHED', '#ff0033')
                   } else {
-                    console.log(`[Sync] Limit hit (Force Mode). Saved: ${res.saved_count}`)
+                    // Silent continuation in Force Mode
+                    console.log(`[TBD] Limit hit (Force). Saved: ${res.saved_count}`)
                   }
                 } else {
-                  UI.updateStatus(`Saved: ${res.saved_count}`, '#00ba7c')
+                  UI.updateStatus(`SAVED:${res.saved_count}`, '#0f0')
                 }
               } catch (e) {
-                UI.updateStatus('Error', '#f4212e')
+                UI.updateStatus('BACKEND ERR', '#ff0033')
               }
             },
             onerror: function (err) {
-              UI.updateStatus('Conn Fail', '#f4212e')
+              UI.updateStatus('CONN FAILED', '#ff0033')
             },
           })
         }
