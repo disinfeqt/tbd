@@ -20,10 +20,12 @@ It runs a local server and uses a browser userscript to intercept the _exact sam
 ## Features
 
 - **🔄 Auto-Sync**: One-click auto-scroll to fetch your entire bookmark history.
-- **📹 Media Daemon**: Background worker automatically downloads media with retry logic and integrity checks.
-- **🗄️ Unified Depot**: Stores everything in SQLite, preserving raw GraphQL responses for future-proofing.
-- **🧠 Smart & Force Modes**: Choose between quick incremental syncs or deep historical recovery.
-- **🔧 Resilient**: Multi-layer parsing (Struct + Regex Fallback) ensures it keeps working even when Twitter's API shifts.
+- **📹 Media Daemon**: Background worker automatically downloads highest-quality images and videos with **smart skipping** of existing files.
+- **🕰️ Timeline Fidelity**: Sets the file modification time to the **original tweet publication date**, keeping your local collection chronologically sorted.
+- **🗄️ SQLite Database**: Deduplicates tweets and stores metadata efficiently.
+
+* **🧠 Smart & Force Modes**: Choose between quick incremental syncs or deep historical recovery.
+* **🔧 Resilient**: Multi-layer parsing (Struct + Regex Fallback) ensures it keeps working even when Twitter's API shifts.
 
 ## Architecture
 
@@ -37,7 +39,7 @@ It runs a local server and uses a browser userscript to intercept the _exact sam
 Ensure you have [Go](https://go.dev/dl/) installed.
 
 ```bash
-git clone https://github.com/your-username/twitter-bookmarks-downloader.git tbd
+git clone https://github.com/rainux/twitter-bookmarks-downloader.git tbd
 cd tbd
 go build -o tbd .
 ./tbd
