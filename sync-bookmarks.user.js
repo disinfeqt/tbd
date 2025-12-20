@@ -15,7 +15,7 @@
   'use strict'
   const RAW_SYNC_URL = 'http://localhost:41008/api/sync-raw'
 
-  console.log('[Sync v0.2] Minimal UI Edition loaded.')
+  console.log('[TBD v0.2] Minimal UI Edition loaded.')
 
   const UI = {
     el: null,
@@ -68,7 +68,7 @@
       controls.appendChild(this.forceBtn)
 
       this.statusEl = document.createElement('div')
-      this.statusEl.innerText = 'Ready'
+      this.statusEl.innerText = 'TBD Ready'
       this.statusEl.style.cssText =
         'text-align: center; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;'
 
@@ -105,7 +105,7 @@
             this.statusEl.innerText = this.isForce ? 'Scrolling (Infinite)' : 'Scrolling (Smart)'
             this.statusEl.style.color = '#eee'
           } else {
-            this.statusEl.innerText = 'Ready'
+            this.statusEl.innerText = 'TBD Ready'
             this.statusEl.style.color = '#888'
           }
         }, 3000)

@@ -1,8 +1,8 @@
-# Twitter Bookmarks Downloader - Developer Guide
+# TBD (Twitter Bookmarks Depot) - Developer Guide
 
 ## 1. Architecture Overview
 
-This project uses a hybrid architecture to safely and reliably sync Twitter bookmarks.
+This project (TBD) uses a hybrid architecture to safely and reliably sync Twitter bookmarks.
 
 - **Frontend (Userscript)**: A Tampermonkey script running on `https://x.com`. It acts as a **passive interceptor**.
 - **Backend (Go)**: A local HTTP server (`:41008`) backed by SQLite. It handles data parsing, storage, and media downloading.
