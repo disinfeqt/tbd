@@ -17,6 +17,8 @@ test_payload.json
 # Binaries
 downloader
 twitter-bookmarks-downloader
+tbd
+tbd.exe
 
 # System
 .DS_Store

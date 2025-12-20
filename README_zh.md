@@ -81,6 +81,10 @@ go build -o tbd .
     - 终端日志会显示 "Saved X new tweets"。
     - 图片和视频会自动下载到 `media/` 目录。
 
+## 开源协议
+
+本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
+
 ## 免责声明
 
 本工具仅供个人学习和归档使用。请尊重内容创作者的版权，并遵守 Twitter/X 的服务条款。

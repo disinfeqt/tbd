@@ -59,6 +59,10 @@ go build -o tbd .
 
 ---
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 ## Disclaimer
 
 This tool is for personal archiving only. Please respect content creators' copyrights and Twitter's TOS.
