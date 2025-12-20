@@ -8,10 +8,11 @@ This file lists the active development tracks for the Twitter Bookmarks Download
 
 ## Planned Tracks (Backlog)
 
-- [ ] **userscript-ui**: Add a visual status indicator to the Twitter webpage. [Link](tracks/userscript-ui/plan.md)
+*(None)*
 
 ## Completed Tracks
 
+- [x] **userscript-ui**: Add a visual status indicator and auto-scroll functionality to the Twitter webpage. [Link](tracks/userscript-ui/plan.md)
 - [x] **legacy-import**: Implement a tool to import legacy `.json` bookmark files into the SQLite database. [Link](tracks/legacy-import/plan.md)
 
 *(None yet)*
