@@ -1,5 +1,7 @@
 # TBD: The Twitter Archival System
 
+**English** | [中文文档](./README_zh.md)
+
 A robust, self-hosted system to sync, archive, and explore your Twitter/X bookmarks locally.
 
 Originally started as a **Twitter Bookmarks Downloader**, **TBD** has evolved into your personal **Twitter Backup Daemon**, acting as the ultimate **Twitter Bookmarks Depot** for your local media collection.
@@ -52,4 +54,3 @@ go build -o tbd .
 ## Disclaimer
 
 This tool is for personal archiving only. Please respect content creators' copyrights and Twitter's TOS.
-
