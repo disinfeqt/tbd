@@ -1,5 +1,13 @@
 # TBD (Twitter Bookmarks Depot) - Developer Guide
 
+# CRITICAL MANDATES
+
+> **⚠️ COMMIT MESSAGE RULES (HIGHEST PRIORITY)**
+>
+> 1.  **NO CONVENTIONAL COMMITS**: Absolutely **DO NOT** use prefixes like `feat:`, `fix:`, `docs:`, `chore:`, etc.
+> 2.  **SIMPLE & DESCRIPTIVE**: Use clear, natural language sentences (e.g., "Add MIT license", "Fix parsing bug").
+> 3.  **CO-AUTHOR**: Always include `Co-authored-by: Gemini <gemini@google.com>`.
+
 ## 1. Architecture Overview
 
 This project (TBD) uses a hybrid architecture to safely and reliably sync Twitter bookmarks.
@@ -63,7 +71,6 @@ Strictly adhere to the legacy format to avoid re-downloading existing libraries:
 
 - **No Proactive Commits**: Do not commit code unless explicitly instructed.
 - **Format**: Run `go fmt ./...` before every commit.
-- **Commit Messages**: Simple, descriptive, non-conventional. Always include `Co-authored-by: Gemini <gemini@google.com>`.
 
 ### Testing Strategy
 
