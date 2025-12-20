@@ -27,6 +27,12 @@ It runs a local server and uses a browser userscript to intercept the _exact sam
 * **🧠 Smart & Force Modes**: Choose between quick incremental syncs or deep historical recovery.
 * **🔧 Resilient**: Multi-layer parsing (Struct + Regex Fallback) ensures it keeps working even when Twitter's API shifts.
 
+## 🚀 Status & Roadmap
+
+- [x] Sync bookmarks (Incremental & Force modes)
+- [x] Auto-download bookmark media (Images & Videos)
+- [ ] Local bookmark gallery/browser UI
+
 ## Architecture
 
 1.  **Frontend (Userscript)**: Hooks into `XMLHttpRequest` on `x.com` to capture data silently.
