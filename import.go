@@ -80,6 +80,10 @@ func processLegacyFile(filePath string) error {
 
 	// 2. Prepare MediaModels and Check File Existence
 	for i, m := range lt.OrderedMedia {
+		if !shouldDownloadMediaURL(m.URL) {
+			continue
+		}
+
 		media := MediaModel{
 			ID:      m.ID,
 			TweetID: lt.ID,

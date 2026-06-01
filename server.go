@@ -16,9 +16,17 @@ type SyncResponse struct {
 
 func StartServer(addr string) error {
 	http.HandleFunc("/api/sync-raw", handleSyncRaw)
+	http.HandleFunc("/api/settings", handleSettings)
 
 	PrintInfoF("Server starting on %s...", addr)
 	return http.ListenAndServe(addr, nil)
+}
+
+func writeJSON(w http.ResponseWriter, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		PrintError(eris.Wrap(err, "Failed to encode JSON response"))
+	}
 }
 
 func handleSyncRaw(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +45,56 @@ func handleSyncRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := ProcessSyncRaw(fullResponse)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, response)
+}
+
+func handleSettings(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		writeJSON(w, CurrentConfig())
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var patch struct {
+		MediaDir       *string `json:"media_dir"`
+		DownloadVideos *bool   `json:"download_videos"`
+		DownloadImages *bool   `json:"download_images"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+		PrintError(eris.Wrap(err, "Failed to decode settings payload"))
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	next := CurrentConfig()
+	if patch.MediaDir != nil {
+		next.MediaDir = *patch.MediaDir
+	}
+	if patch.DownloadVideos != nil {
+		next.DownloadVideos = *patch.DownloadVideos
+	}
+	if patch.DownloadImages != nil {
+		next.DownloadImages = *patch.DownloadImages
+	}
+
+	if err := UpdateConfig(configPath, next); err != nil {
+		PrintError(eris.Wrap(err, "Failed to save settings"))
+		http.Error(w, "Failed to save settings", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, CurrentConfig())
 }

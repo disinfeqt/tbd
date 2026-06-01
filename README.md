@@ -1,68 +1,113 @@
-# TBD: The Twitter Archival System
+# TBD
 
-**English** | [中文文档](./README_zh.md)
+TBD 用来把 X/Twitter 书签同步到本地，并下载书签里的媒体文件。
 
-A robust, self-hosted system to sync, archive, and explore your Twitter/X bookmarks locally.
+原始 fork：[rainux/twitter-bookmarks-downloader](https://github.com/rainux/twitter-bookmarks-downloader)
 
-Originally started as a **Twitter Bookmarks Downloader**, **TBD** has evolved into your personal **Twitter Backup Daemon**, acting as the ultimate **Twitter Bookmarks Depot** for your local media collection.
+它由两部分组成：
 
-## Why TBD?
+- 本地 Go 服务：保存书签到 `bookmarks.db`，下载媒体到 `media/`
+- Tampermonkey 用户脚本：在 `x.com/i/bookmarks` 页面捕获浏览器收到的书签数据并发送给本地服务
 
-Most tools rely on expensive APIs or fragile scraping. **TBD** takes a different approach: **Passive Interception**.
+默认下载视频和图片。图片下载可以在页面左下角控制面板里关闭。
 
-It runs a local server and uses a browser userscript to intercept the _exact same data_ your browser receives from Twitter.
+## 安装
 
-- **No API Keys Required**: If you can see it, TBD can save it.
-- **True Sync**: It's not a one-off export; it's a persistent, deduplicated local library.
-- **Media-First**: Focuses on preserving highest-quality images and videos before they are deleted or the user is suspended.
-- **Privacy-Centric**: Your data stays on your machine in a local SQLite database.
+### 1. 编译并启动本地服务
 
-## Features
-
-- **🔄 Auto-Sync**: One-click auto-scroll to fetch your entire bookmark history.
-- **📹 Media Daemon**: Background worker automatically downloads highest-quality images and videos with **smart skipping** of existing files.
-- **🕰️ Timeline Fidelity**: Sets the file modification time to the **original tweet publication date**, keeping your local collection chronologically sorted.
-- **🗄️ SQLite Database**: Deduplicates tweets and stores metadata efficiently.
-
-* **🧠 Smart & Force Modes**: Choose between quick incremental syncs or deep historical recovery.
-* **🔧 Resilient**: Multi-layer parsing (Struct + Regex Fallback) ensures it keeps working even when Twitter's API shifts.
-
-## 🚀 Status & Roadmap
-
-- [x] Sync bookmarks (Incremental & Force modes)
-- [x] Auto-download bookmark media (Images & Videos)
-- [ ] Local bookmark gallery/browser UI
-
-## Architecture
-
-1.  **Frontend (Userscript)**: Hooks into `XMLHttpRequest` on `x.com` to capture data silently.
-2.  **Backend (Go)**: A lightweight daemon (`:41008`) that parses data, manages the SQLite database, and handles heavy-duty media downloads.
-
-## Getting Started
-
-### 1. Backend
-
-Ensure you have [Go](https://go.dev/dl/) installed.
+先安装 [Go](https://go.dev/dl/)，然后在项目目录运行：
 
 ```bash
-git clone https://github.com/rainux/twitter-bookmarks-downloader.git tbd
-cd tbd
 go build -o tbd .
 ./tbd
 ```
 
-### 2. Frontend
+服务会监听 `http://localhost:41008`。使用时保持这个终端窗口运行。
 
-1.  Install **Tampermonkey**.
-2.  Create a new script using the content of `sync-bookmarks.user.js`.
-3.  Open your **[Twitter Bookmarks](https://x.com/i/bookmarks)** and use the TBD control panel in the bottom-left corner.
+### 2. 安装 Tampermonkey 脚本
 
----
+1. 安装 Tampermonkey 浏览器扩展。
+2. 打开 Tampermonkey 的设置页，启用 **Allow User Scripts**。这一步必须打开，否则用户脚本可能不会正常运行。
+3. 在 Tampermonkey 里创建新脚本。
+4. 把 [sync-bookmarks.user.js](./sync-bookmarks.user.js) 的完整内容复制进去并保存。
+5. 确认脚本处于启用状态。
 
-## License
+## 使用
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+1. 先运行本地服务：
 
-## Disclaimer
+```bash
+./tbd
+```
 
-This tool is for personal archiving only. Please respect content creators' copyrights and Twitter's TOS.
+2. 打开 X/Twitter 书签页：
+
+```text
+https://x.com/i/bookmarks
+```
+
+3. 页面左下角会出现 TBD 控制面板：
+
+- `[RUN]`：开始自动向下滚动并同步书签
+- `[STOP]`：停止自动滚动
+- `[FORCE:OFF]`：智能模式，遇到连续重复书签会自动停止
+- `[FORCE:ON]`：强力模式，忽略重复并继续向下滚动
+- `[IMG:ON]`：允许下载图片
+- `[IMG:OFF]`：不下载图片
+
+4. 下载结果：
+
+- 数据库：`bookmarks.db`
+- 媒体文件：`media/`
+- 日志：`logs`
+
+## 导出 @handles
+
+导出已保存书签里的唯一作者用户名：
+
+```bash
+./tbd --export-handles
+```
+
+默认输出到 `handles.json`。如果想指定路径：
+
+```bash
+./tbd --export-handles --handles-output my-handles.json
+```
+
+## 设置
+
+首次保存设置后会生成 `config.json`：
+
+```json
+{
+  "media_dir": "media",
+  "download_videos": true,
+  "download_images": true
+}
+```
+
+通常不需要手动编辑。图片下载可以直接在页面控制面板里开关。
+
+## 常见问题
+
+### 页面左下角没有控制面板
+
+检查：
+
+- Tampermonkey 扩展已启用
+- 脚本已启用
+- Tampermonkey 设置里的 **Allow User Scripts** 已启用
+- 当前页面是 `https://x.com/i/bookmarks`
+
+### 有待下载数量，但暂时看不到新文件
+
+大视频下载需要时间。新版服务会在终端显示开始下载和进度；如果没有这些日志，重启 `./tbd`。
+
+### 更新脚本后没有生效
+
+回到 Tampermonkey，把 [sync-bookmarks.user.js](./sync-bookmarks.user.js) 的最新内容重新复制进去并保存。
+
+## 许可证
+
+MIT。仅用于个人归档，请自行遵守 X/Twitter 的服务条款和内容版权要求。

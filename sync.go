@@ -136,11 +136,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 				FullText         string `json:"full_text"`
 				CreatedAt        string `json:"created_at"`
 				ExtendedEntities struct {
-					Media []struct {
-						IDStr         string `json:"id_str"`
-						Type          string `json:"type"`
-						MediaURLHttps string `json:"media_url_https"`
-					} `json:"media"`
+					Media []tweetMediaEntity `json:"media"`
 				} `json:"extended_entities"`
 			} `json:"legacy"`
 			Core struct {
@@ -225,16 +221,21 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		var mediaFilenames []string
 		mediaCount := len(tweet.Legacy.ExtendedEntities.Media)
 		for i, m := range tweet.Legacy.ExtendedEntities.Media {
+			downloadURL := downloadURLForMedia(m)
+			if !shouldDownloadMediaURL(downloadURL) {
+				continue
+			}
+
 			tm.Media = append(tm.Media, MediaModel{
 				ID:      m.IDStr,
 				TweetID: tweetID,
 				Index:   i,
 				Type:    m.Type,
-				URL:     m.MediaURLHttps,
+				URL:     downloadURL,
 			})
 
 			// Generate simulated filename for debug
-			if parsedURL, err := url.Parse(m.MediaURLHttps); err == nil {
+			if parsedURL, err := url.Parse(downloadURL); err == nil {
 				mediaFilenames = append(mediaFilenames, buildFilename(tm, i, mediaCount, parsedURL))
 			}
 		}

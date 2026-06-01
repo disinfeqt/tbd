@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bookmarks Sync to Local
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Intercept XHR to sync bookmarks and provide Auto-Scroll feature.
 // @author       Gemini
 // @match        https://x.com/*
@@ -9,21 +9,29 @@
 // @run-at       document-start
 // @grant        unsafeWindow
 // @grant        GM_xmlhttpRequest
+// @connect      localhost
 // ==/UserScript==
 
 ;(function () {
   'use strict'
   const RAW_SYNC_URL = 'http://localhost:41008/api/sync-raw'
+  const SETTINGS_URL = 'http://localhost:41008/api/settings'
 
-  console.log('[TBD v0.2] Terminal UI Edition loaded.')
+  console.log('[TBD v0.3] Terminal UI Edition loaded.')
 
   const UI = {
     el: null,
     btn: null,
     statusEl: null,
     forceBtn: null,
+    imageBtn: null,
     timeout: null,
     isForce: false,
+    settings: {
+      media_dir: 'media',
+      download_videos: true,
+      download_images: true,
+    },
 
     init() {
       this.el = document.createElement('div')
@@ -67,13 +75,27 @@
       controls.appendChild(this.btn)
       controls.appendChild(this.forceBtn)
 
+      const settingsControls = document.createElement('div')
+      settingsControls.style.cssText =
+        'display: flex; justify-content: flex-start; align-items: center; gap: 12px;'
+
+      this.imageBtn = document.createElement('div')
+      this.imageBtn.innerText = '[IMG:ON]'
+      this.imageBtn.style.cssText =
+        'cursor: pointer; color: #ff9f00; font-size: 10px; text-shadow: 0 0 2px #ff9f00;'
+      this.imageBtn.title = 'Toggle image downloads'
+      this.imageBtn.onclick = () => this.toggleImages()
+      settingsControls.appendChild(this.imageBtn)
+
       this.statusEl = document.createElement('div')
       this.statusEl.innerText = '> SYSTEM READY'
       this.statusEl.style.cssText =
         'color: #0f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; border-top: 1px dashed #333; padding-top: 6px; font-size: 11px;'
 
       this.el.appendChild(controls)
+      this.el.appendChild(settingsControls)
       this.el.appendChild(this.statusEl)
+      this.loadSettings()
 
       const monitor = () => {
         if (!document.body) {
@@ -151,6 +173,67 @@
 
     isForceMode() {
       return this.isForce
+    },
+
+    loadSettings() {
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: SETTINGS_URL,
+        onload: (response) => {
+          try {
+            this.applySettings(JSON.parse(response.responseText))
+          } catch (e) {
+            this.updateStatus('SETTINGS ERR', '#ff0033')
+          }
+        },
+        onerror: () => {
+          this.updateStatus('CONN FAILED', '#ff0033')
+        },
+      })
+    },
+
+    applySettings(settings) {
+      this.settings = {
+        media_dir: settings.media_dir || 'media',
+        download_videos: settings.download_videos !== false,
+        download_images: settings.download_images !== false,
+      }
+      this.updateSettingsButtons()
+    },
+
+    updateSettingsButtons() {
+      if (!this.imageBtn) return
+
+      const enabled = this.settings.download_images
+      this.imageBtn.innerText = enabled ? '[IMG:ON]' : '[IMG:OFF]'
+      this.imageBtn.style.color = enabled ? '#ff9f00' : '#666'
+      this.imageBtn.style.textShadow = enabled ? '0 0 2px #ff9f00' : 'none'
+    },
+
+    toggleImages() {
+      const next = {
+        media_dir: this.settings.media_dir,
+        download_videos: true,
+        download_images: !this.settings.download_images,
+      }
+
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: SETTINGS_URL,
+        headers: { 'Content-Type': 'application/json' },
+        data: JSON.stringify(next),
+        onload: (response) => {
+          try {
+            this.applySettings(JSON.parse(response.responseText))
+            this.updateStatus(this.settings.download_images ? 'IMG:ON' : 'IMG:OFF', '#888')
+          } catch (e) {
+            this.updateStatus('SETTINGS ERR', '#ff0033')
+          }
+        },
+        onerror: () => {
+          this.updateStatus('SAVE FAILED', '#ff0033')
+        },
+      })
     },
   }
 
