@@ -22,7 +22,7 @@ func TestFileExt(t *testing.T) {
 func TestBuildFilename(t *testing.T) {
 	// Use a fixed UTC time for consistency
 	createdAtUTC := time.Date(2025, 2, 28, 8, 54, 5, 0, time.UTC)
-	
+
 	tweet := &TweetModel{
 		ID:         "1895276249498689869",
 		ScreenName: "nekoplanetOuO",

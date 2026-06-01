@@ -2,7 +2,7 @@
 
 TBD 用来把 X/Twitter 书签同步到本地，并下载书签里的媒体文件。
 
-原始 fork：[rainux/twitter-bookmarks-downloader](https://github.com/rainux/twitter-bookmarks-downloader)
+原始 repo：[0x1b2c/twitter-bookmarks-downloader](https://github.com/0x1b2c/twitter-bookmarks-downloader)
 
 它由两部分组成：
 
@@ -27,7 +27,7 @@ go build -o tbd .
 ### 2. 安装 Tampermonkey 脚本
 
 1. 安装 Tampermonkey 浏览器扩展。
-2. 打开 Tampermonkey 的设置页，启用 **Allow User Scripts**。这一步必须打开，否则用户脚本可能不会正常运行。
+2. 打开 Tampermonkey 的设置页，启用 **Allow User Scripts**。这一步必须打开，否则用户脚本不会正常运行。
 3. 在 Tampermonkey 里创建新脚本。
 4. 把 [sync-bookmarks.user.js](./sync-bookmarks.user.js) 的完整内容复制进去并保存。
 5. 确认脚本处于启用状态。
@@ -48,12 +48,11 @@ https://x.com/i/bookmarks
 
 3. 页面左下角会出现 TBD 控制面板：
 
-- `[RUN]`：开始自动向下滚动并同步书签
-- `[STOP]`：停止自动滚动
-- `[FORCE:OFF]`：智能模式，遇到连续重复书签会自动停止
-- `[FORCE:ON]`：强力模式，忽略重复并继续向下滚动
-- `[IMG:ON]`：允许下载图片
-- `[IMG:OFF]`：不下载图片
+- `Start sync` / `Stop sync`：开始或停止自动向下滚动并同步书签
+- `Auto-stop on`：遇到连续重复书签后自动停止
+- `Auto-stop off`：忽略重复并继续向下滚动，适合深度重扫
+- `Download videos: on/off`：控制是否下载视频
+- `Download images: on/off`：控制是否下载图片
 
 4. 下载结果：
 
@@ -77,7 +76,7 @@ https://x.com/i/bookmarks
 
 ## 设置
 
-首次保存设置后会生成 `config.json`：
+首次运行服务时会生成 `config.json`：
 
 ```json
 {
@@ -87,7 +86,7 @@ https://x.com/i/bookmarks
 }
 ```
 
-通常不需要手动编辑。图片下载可以直接在页面控制面板里开关。
+通常不需要手动编辑。视频和图片下载可以直接在页面控制面板里开关。
 
 ## 常见问题
 

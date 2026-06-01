@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -35,7 +34,7 @@ func ImportLegacyData(tweetsDir string) error {
 		return eris.Wrap(err, "failed to read tweets directory")
 	}
 
-	count := 0
+	imported := 0
 	skipped := 0
 
 	for _, file := range files {
@@ -44,26 +43,31 @@ func ImportLegacyData(tweetsDir string) error {
 		}
 
 		filePath := filepath.Join(tweetsDir, file.Name())
-		if err := processLegacyFile(filePath); err != nil {
+		created, err := processLegacyFile(filePath)
+		if err != nil {
 			PrintError(eris.Wrapf(err, "Failed to import %s", file.Name()))
 			continue
 		}
-		count++
+		if created {
+			imported++
+		} else {
+			skipped++
+		}
 	}
 
-	PrintInfoF("Legacy import complete. Processed: %d, Skipped (existing): %d", count, skipped)
+	PrintInfoF("Legacy import complete. Imported: %d, Skipped (existing): %d", imported, skipped)
 	return nil
 }
 
-func processLegacyFile(filePath string) error {
+func processLegacyFile(filePath string) (bool, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return eris.Wrap(err, "failed to read file")
+		return false, eris.Wrap(err, "failed to read file")
 	}
 
 	var lt LegacyTweet
 	if err := json.Unmarshal(content, &lt); err != nil {
-		return eris.Wrap(err, "failed to unmarshal legacy json")
+		return false, eris.Wrap(err, "failed to unmarshal legacy json")
 	}
 
 	// 1. Create TweetModel
@@ -80,10 +84,6 @@ func processLegacyFile(filePath string) error {
 
 	// 2. Prepare MediaModels and Check File Existence
 	for i, m := range lt.OrderedMedia {
-		if !shouldDownloadMediaURL(m.URL) {
-			continue
-		}
-
 		media := MediaModel{
 			ID:      m.ID,
 			TweetID: lt.ID,
@@ -104,11 +104,12 @@ func processLegacyFile(filePath string) error {
 	// We use Clauses to ignore if the tweet ID already exists.
 	// However, we might want to update the RawJSON if it was empty?
 	// For simplicity, we skip existing tweets to avoid overwriting newer data.
-	if err := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&tweet).Error; err != nil {
-		return eris.Wrap(err, "db create failed")
+	result := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&tweet)
+	if result.Error != nil {
+		return false, eris.Wrap(result.Error, "db create failed")
 	}
 
-	return nil
+	return result.RowsAffected > 0, nil
 }
 
 func checkMediaFileExists(tweet *TweetModel, index int, total int, mediaURL string) (bool, error) {
@@ -118,7 +119,7 @@ func checkMediaFileExists(tweet *TweetModel, index int, total int, mediaURL stri
 	}
 
 	filename := buildFilename(tweet, index, total, parsedURL)
-	fullPath := path.Join(config.MediaDir, filename)
+	fullPath := filepath.Join(CurrentConfig().MediaDir, filename)
 
 	if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 		// File exists

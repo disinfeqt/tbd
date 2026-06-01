@@ -8,10 +8,12 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/rotisserie/eris"
+	"gorm.io/gorm"
 )
 
 func StartDownloadWorker() {
@@ -35,19 +37,41 @@ func StartDownloadWorker() {
 
 func ReportWorkerStatus(force bool) {
 	var pending int64
+	var paused int64
 	var failed int64
-	if err := DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&pending).Error; err != nil {
+	if err := pendingDownloadQuery().Count(&pending).Error; err != nil {
 		PrintError(eris.Wrap(err, "Failed to count pending media"))
+	}
+	if err := DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&paused).Error; err == nil {
+		paused -= pending
+	} else {
+		PrintError(eris.Wrap(err, "Failed to count paused media"))
 	}
 	if err := DB.Model(&MediaModel{}).Where("failed = ?", true).Count(&failed).Error; err != nil {
 		PrintError(eris.Wrap(err, "Failed to count failed media"))
 	}
 
-	if force || pending > 0 || failed > 0 {
-		PrintInfoF("[Worker Status] Pending: %d | Failed: %d", pending, failed)
+	if force || pending > 0 || paused > 0 || failed > 0 {
+		PrintInfoF("[Worker Status] Pending: %d | Paused by settings: %d | Failed: %d", pending, paused, failed)
 		if failed > 0 {
 			PrintWarningF("  %d media items failed permanently after multiple retries.", failed)
 		}
+	}
+}
+
+func pendingDownloadQuery() *gorm.DB {
+	query := DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false)
+	current := CurrentConfig()
+
+	switch {
+	case current.DownloadImages && current.DownloadVideos:
+		return query
+	case current.DownloadImages:
+		return query.Where("type = ?", "photo")
+	case current.DownloadVideos:
+		return query.Where("type IN ?", []string{"video", "animated_gif"})
+	default:
+		return query.Where("1 = 0")
 	}
 }
 
@@ -58,14 +82,14 @@ func DownloadPendingMedia() {
 		PrintError(eris.Wrap(err, "Failed to count total media"))
 		return
 	}
-	if err := DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&pending).Error; err != nil {
+	if err := pendingDownloadQuery().Count(&pending).Error; err != nil {
 		PrintError(eris.Wrap(err, "Failed to count pending media"))
 		return
 	}
 
 	var mediaList []MediaModel
 	// Find up to 5 pending downloads
-	err := DB.Where("downloaded = ? AND failed = ?", false, false).Limit(5).Find(&mediaList).Error
+	err := pendingDownloadQuery().Limit(5).Find(&mediaList).Error
 	if err != nil {
 		PrintError(eris.Wrap(err, "Failed to query pending media"))
 		return
@@ -78,21 +102,18 @@ func DownloadPendingMedia() {
 	completed := total - pending
 	for i, media := range mediaList {
 		progressLabel := fmt.Sprintf("%d/%d", completed+int64(i)+1, total)
-		var err error
-		if !shouldDownloadMediaURL(media.URL) {
-			PrintInfoF("  [Download %s] Skipped disabled media: %s", progressLabel, media.URL)
-			media.Downloaded = true
-		} else {
-			err = processMediaDownload(&media, progressLabel)
+		if !shouldDownloadMedia(media) {
+			continue
 		}
 
+		err := processMediaDownload(&media, progressLabel)
 		if err != nil {
 			PrintError(eris.Wrapf(err, "Media ID: %s", media.ID))
 			media.RetryCount++
 			if media.RetryCount >= 3 {
 				media.Failed = true
 			}
-		} else if shouldDownloadMediaURL(media.URL) {
+		} else {
 			media.Downloaded = true
 		}
 		if err := DB.Save(&media).Error; err != nil {
@@ -126,7 +147,7 @@ func processMediaDownload(media *MediaModel, progressLabel string) error {
 	}
 
 	filename := buildFilename(&tweet, media.Index, int(mediaCount), parsedURL)
-	outputPath := path.Join(config.MediaDir, filename)
+	outputPath := filepath.Join(CurrentConfig().MediaDir, filename)
 
 	if err := downloadFile(parsedURL.String(), outputPath, tweet.CreatedAt, progressLabel); err != nil {
 		return eris.Wrapf(err, "URL: %s (from Tweet: %s)", media.URL, tweet.PermanentURL)
@@ -209,10 +230,8 @@ func newTimedRequest(method string, urlStr string, timeout time.Duration) (*http
 }
 
 func downloadFile(urlStr string, outputPath string, modTime time.Time, progressLabel string) error {
-	if _, err := os.Stat(config.MediaDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(config.MediaDir, 0o755); err != nil {
-			return eris.Wrap(err, "failed to create media directory")
-		}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return eris.Wrap(err, "failed to create media directory")
 	}
 
 	// 像原版一样校验文件大小

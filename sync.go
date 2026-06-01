@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"regexp"
 	"time"
+
+	"gorm.io/gorm/clause"
 )
 
 /*
@@ -103,12 +105,12 @@ func ProcessSyncRaw(fullJSON json.RawMessage) SyncResponse {
 			Tweet    json.RawMessage `json:"tweet"`
 		}
 		if err := json.Unmarshal(rt, &wrap); err == nil {
-			if wrap.Typename == "Tweet" {
-				cleanTweets = append(cleanTweets, rt)
-			} else if wrap.Tweet != nil {
+			if wrap.Tweet != nil {
 				cleanTweets = append(cleanTweets, wrap.Tweet)
+				continue
 			}
 		}
+		cleanTweets = append(cleanTweets, rt)
 	}
 
 	return processRawTweetResults(cleanTweets)
@@ -191,6 +193,13 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		var exists int64
 		DB.Model(&TweetModel{}).Where("id = ?", tweetID).Count(&exists)
 		if exists > 0 {
+			backfilled, err := createMissingMedia(tweetID, tweet.Legacy.ExtendedEntities.Media)
+			if err != nil {
+				PrintError(err)
+			} else if backfilled > 0 {
+				PrintInfoF("Backfilled %d media records for existing tweet %s", backfilled, tweetID)
+			}
+
 			duplicateStreak++
 			if duplicateStreak >= DUPLICATE_THRESHOLD {
 				duplicateLimitReached = true
@@ -220,23 +229,14 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 
 		var mediaFilenames []string
 		mediaCount := len(tweet.Legacy.ExtendedEntities.Media)
-		for i, m := range tweet.Legacy.ExtendedEntities.Media {
-			downloadURL := downloadURLForMedia(m)
-			if !shouldDownloadMediaURL(downloadURL) {
-				continue
-			}
+		tm.Media = mediaModelsForTweet(tweetID, tweet.Legacy.ExtendedEntities.Media)
 
-			tm.Media = append(tm.Media, MediaModel{
-				ID:      m.IDStr,
-				TweetID: tweetID,
-				Index:   i,
-				Type:    m.Type,
-				URL:     downloadURL,
-			})
-
+		for _, media := range tm.Media {
 			// Generate simulated filename for debug
-			if parsedURL, err := url.Parse(downloadURL); err == nil {
-				mediaFilenames = append(mediaFilenames, buildFilename(tm, i, mediaCount, parsedURL))
+			if shouldDownloadMedia(media) {
+				if parsedURL, err := url.Parse(media.URL); err == nil {
+					mediaFilenames = append(mediaFilenames, buildFilename(tm, media.Index, mediaCount, parsedURL))
+				}
 			}
 		}
 
@@ -267,4 +267,35 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		DuplicateLimitReached: duplicateLimitReached,
 		SavedCount:            savedCount,
 	}
+}
+
+func mediaModelsForTweet(tweetID string, entities []tweetMediaEntity) []MediaModel {
+	mediaModels := make([]MediaModel, 0, len(entities))
+
+	for i, m := range entities {
+		downloadURL := downloadURLForMedia(m)
+		if downloadURL == "" {
+			continue
+		}
+
+		mediaModels = append(mediaModels, MediaModel{
+			ID:      m.IDStr,
+			TweetID: tweetID,
+			Index:   i,
+			Type:    m.Type,
+			URL:     downloadURL,
+		})
+	}
+
+	return mediaModels
+}
+
+func createMissingMedia(tweetID string, entities []tweetMediaEntity) (int64, error) {
+	mediaModels := mediaModelsForTweet(tweetID, entities)
+	if len(mediaModels) == 0 {
+		return 0, nil
+	}
+
+	result := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&mediaModels)
+	return result.RowsAffected, result.Error
 }

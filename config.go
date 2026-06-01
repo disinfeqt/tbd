@@ -21,10 +21,14 @@ const configPath = "config.json"
 var isReleaseBuild bool
 var configMu sync.RWMutex
 
-var config Config = Config{
-	MediaDir:       "media",
-	DownloadVideos: true,
-	DownloadImages: true,
+var config Config = defaultConfig()
+
+func defaultConfig() Config {
+	return Config{
+		MediaDir:       "media",
+		DownloadVideos: true,
+		DownloadImages: true,
+	}
 }
 
 func init() {
@@ -43,12 +47,12 @@ func LoadConfig(configPath string) error {
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return UpdateConfig(configPath, defaultConfig())
 		}
 		return eris.Wrap(err, "failed to read config")
 	}
 
-	next := config
+	next := defaultConfig()
 	if err := json.Unmarshal(content, &next); err != nil {
 		return eris.Wrap(err, "failed to parse config")
 	}
@@ -69,10 +73,14 @@ func UpdateConfig(configPath string, next Config) error {
 	}
 
 	configMu.Lock()
-	config = next
-	configMu.Unlock()
+	defer configMu.Unlock()
 
-	return SaveConfig(configPath, next)
+	if err := SaveConfig(configPath, next); err != nil {
+		return err
+	}
+
+	config = next
+	return nil
 }
 
 func SaveConfig(configPath string, next Config) error {
@@ -95,4 +103,17 @@ func shouldDownloadMediaURL(rawURL string) bool {
 	}
 
 	return current.DownloadImages
+}
+
+func shouldDownloadMedia(media MediaModel) bool {
+	current := CurrentConfig()
+
+	switch media.Type {
+	case "photo":
+		return current.DownloadImages
+	case "video", "animated_gif":
+		return current.DownloadVideos
+	default:
+		return shouldDownloadMediaURL(media.URL)
+	}
 }

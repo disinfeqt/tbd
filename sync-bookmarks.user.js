@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Twitter Bookmarks Sync to Local
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.6
 // @description  Intercept XHR to sync bookmarks and provide Auto-Scroll feature.
-// @author       Gemini
+// @author       TBD
 // @match        https://x.com/*
 // @match        https://twitter.com/*
 // @run-at       document-start
@@ -17,13 +17,14 @@
   const RAW_SYNC_URL = 'http://localhost:41008/api/sync-raw'
   const SETTINGS_URL = 'http://localhost:41008/api/settings'
 
-  console.log('[TBD v0.3] Terminal UI Edition loaded.')
+  console.log('[TBD v0.6] Overlay loaded.')
 
   const UI = {
     el: null,
     btn: null,
     statusEl: null,
     forceBtn: null,
+    videoBtn: null,
     imageBtn: null,
     timeout: null,
     isForce: false,
@@ -33,68 +34,95 @@
       download_images: true,
     },
 
+    createButton(text) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.innerText = text
+      button.style.cssText = `
+                height: 34px;
+                border: 1px solid #cfd9de;
+                border-radius: 8px;
+                background: #eff3f4;
+                color: #0f1419;
+                cursor: pointer;
+                font: inherit;
+                font-weight: 650;
+                padding: 0 10px;
+                white-space: nowrap;
+                width: 100%;
+            `
+      return button
+    },
+
     init() {
       this.el = document.createElement('div')
       this.el.style.cssText = `
                 position: fixed;
-                bottom: 80px;
+                bottom: 24px;
                 left: 20px;
-                background: #000;
-                color: #0f0;
-                padding: 10px 14px;
-                border-radius: 4px;
-                font-family: "Consolas", "Monaco", "Courier New", monospace;
-                font-size: 12px;
+                width: 220px;
+                background: #ffffff;
+                color: #0f1419;
+                padding: 12px;
+                border-radius: 8px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-size: 13px;
                 z-index: 999999;
-                border: 1px solid #333;
-                box-shadow: 0 0 10px rgba(0, 255, 0, 0.1);
+                border: 1px solid #cfd9de;
+                box-shadow: 0 8px 24px rgba(15, 20, 25, 0.16);
                 display: flex;
                 flex-direction: column;
-                gap: 8px;
-                min-width: 130px;
+                gap: 10px;
                 user-select: none;
-                letter-spacing: 0.5px;
+                letter-spacing: 0;
             `
 
-      const controls = document.createElement('div')
-      controls.style.cssText =
-        'display: flex; justify-content: space-between; align-items: center; gap: 12px;'
+      const header = document.createElement('div')
+      header.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
 
-      this.btn = document.createElement('div')
-      this.btn.innerText = '[RUN]'
-      this.btn.style.cssText =
-        'cursor: pointer; font-weight: bold; color: #0f0; text-shadow: 0 0 2px rgba(0,255,0,0.5);'
-      this.btn.onclick = () => Scroller.toggle()
-
-      this.forceBtn = document.createElement('div')
-      this.forceBtn.innerText = '[FORCE:OFF]'
-      this.forceBtn.style.cssText = 'cursor: pointer; color: #666; font-size: 10px;'
-      this.forceBtn.title = 'Toggle Force Mode'
-      this.forceBtn.onclick = () => this.toggleForce()
-
-      controls.appendChild(this.btn)
-      controls.appendChild(this.forceBtn)
-
-      const settingsControls = document.createElement('div')
-      settingsControls.style.cssText =
-        'display: flex; justify-content: flex-start; align-items: center; gap: 12px;'
-
-      this.imageBtn = document.createElement('div')
-      this.imageBtn.innerText = '[IMG:ON]'
-      this.imageBtn.style.cssText =
-        'cursor: pointer; color: #ff9f00; font-size: 10px; text-shadow: 0 0 2px #ff9f00;'
-      this.imageBtn.title = 'Toggle image downloads'
-      this.imageBtn.onclick = () => this.toggleImages()
-      settingsControls.appendChild(this.imageBtn)
+      const title = document.createElement('div')
+      title.innerText = 'TBD'
+      title.style.cssText = 'font-size: 13px; font-weight: 750;'
 
       this.statusEl = document.createElement('div')
-      this.statusEl.innerText = '> SYSTEM READY'
+      this.statusEl.innerText = 'Ready'
       this.statusEl.style.cssText =
-        'color: #0f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; border-top: 1px dashed #333; padding-top: 6px; font-size: 11px;'
+        'color: #536471; font-size: 12px; font-weight: 600; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;'
 
-      this.el.appendChild(controls)
+      header.appendChild(title)
+      header.appendChild(this.statusEl)
+
+      this.btn = this.createButton('Start sync')
+      this.btn.style.width = '100%'
+      this.btn.style.background = '#1d9bf0'
+      this.btn.style.borderColor = '#1d9bf0'
+      this.btn.style.color = '#ffffff'
+      this.btn.onclick = () => Scroller.toggle()
+
+      const settingsControls = document.createElement('div')
+      settingsControls.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      this.forceBtn = this.createButton('')
+      this.forceBtn.title = 'Auto-stop stops syncing after several already-saved bookmarks in a row. Turn it off for a deeper re-scan.'
+      this.forceBtn.onclick = () => this.toggleForce()
+
+      this.videoBtn = this.createButton('')
+      this.videoBtn.title = 'Save this as the download_videos setting. When off, video media stays queued but is not downloaded.'
+      this.videoBtn.onclick = () => this.toggleVideos()
+
+      this.imageBtn = this.createButton('')
+      this.imageBtn.title = 'Save this as the download_images setting. When off, image media stays queued but is not downloaded.'
+      this.imageBtn.onclick = () => this.toggleImages()
+
+      settingsControls.appendChild(this.forceBtn)
+      settingsControls.appendChild(this.videoBtn)
+      settingsControls.appendChild(this.imageBtn)
+
+      this.el.appendChild(header)
+      this.el.appendChild(this.btn)
       this.el.appendChild(settingsControls)
-      this.el.appendChild(this.statusEl)
+      this.updateModeButton()
+      this.updateSettingsButtons()
       this.loadSettings()
 
       const monitor = () => {
@@ -115,59 +143,55 @@
       monitor()
     },
 
-    updateStatus(text, color = '#0f0') {
-      this.statusEl.innerText = `> ${text}`
-      this.statusEl.style.color = color
+    updateStatus(text, tone = 'neutral', autoReset = false) {
+      const colors = {
+        neutral: '#536471',
+        active: '#1d9bf0',
+        success: '#008a00',
+        warning: '#b45f00',
+        danger: '#b00020',
+      }
 
-      if (color !== '#0f0' && color !== '#888') {
-        if (this.timeout) clearTimeout(this.timeout)
-        this.timeout = setTimeout(() => {
-          if (Scroller.active) {
-            const mode = this.isForce ? 'INFINITE' : 'SMART'
-            this.statusEl.innerText = `> SCROLLING:${mode}`
-            this.statusEl.style.color = '#0ff'
-          } else {
-            this.statusEl.innerText = '> SYSTEM READY'
-            this.statusEl.style.color = '#0f0'
-          }
-        }, 2000)
+      this.statusEl.innerText = text
+      this.statusEl.style.color = colors[tone] || colors.neutral
+
+      if (this.timeout) clearTimeout(this.timeout)
+      if (autoReset) {
+        this.timeout = setTimeout(() => this.resetStatus(), 2200)
+      }
+    },
+
+    resetStatus() {
+      if (Scroller.active) {
+        this.updateStatus(this.isForce ? 'Syncing - auto-stop off' : 'Syncing - auto-stop on', 'active')
+      } else {
+        this.updateStatus('Ready')
       }
     },
 
     toggleForce() {
       this.isForce = !this.isForce
-      this.forceBtn.innerText = this.isForce ? '[FORCE:ON]' : '[FORCE:OFF]'
-      this.forceBtn.style.color = this.isForce ? '#ff9f00' : '#666'
-      this.forceBtn.style.textShadow = this.isForce ? '0 0 2px #ff9f00' : 'none'
-
+      this.updateModeButton()
       if (Scroller.active) {
-        this.statusEl.innerText = `> SCROLLING:${this.isForce ? 'INFINITE' : 'SMART'}`
+        this.resetStatus()
       } else {
-        this.updateStatus(
-          this.isForce ? 'MODE:FORCE' : 'MODE:SMART',
-          this.isForce ? '#ff9f00' : '#888'
-        )
+        this.updateStatus(this.isForce ? 'Auto-stop off' : 'Auto-stop on', 'neutral', true)
       }
     },
 
     setScrolling(isScrolling) {
       if (isScrolling) {
-        this.btn.innerText = '[STOP]'
-        this.btn.style.color = '#ff0033'
-        this.btn.style.textShadow = '0 0 2px #ff0033'
-
-        const mode = this.isForce ? 'INFINITE' : 'SMART'
-        this.statusEl.innerText = `> SCROLLING:${mode}`
-        this.statusEl.style.color = '#0ff' // Cyan for active state
-        this.el.style.borderColor = '#0ff'
+        this.btn.innerText = 'Stop sync'
+        this.btn.style.background = '#f4212e'
+        this.btn.style.borderColor = '#f4212e'
+        this.el.style.borderColor = '#1d9bf0'
+        this.resetStatus()
       } else {
-        this.btn.innerText = '[RUN]'
-        this.btn.style.color = '#0f0'
-        this.btn.style.textShadow = '0 0 2px #0f0'
-
-        this.statusEl.innerText = '> HALTED'
-        this.statusEl.style.color = '#888'
-        this.el.style.borderColor = '#333'
+        this.btn.innerText = 'Start sync'
+        this.btn.style.background = '#1d9bf0'
+        this.btn.style.borderColor = '#1d9bf0'
+        this.el.style.borderColor = '#cfd9de'
+        this.updateStatus('Stopped')
       }
     },
 
@@ -183,11 +207,11 @@
           try {
             this.applySettings(JSON.parse(response.responseText))
           } catch (e) {
-            this.updateStatus('SETTINGS ERR', '#ff0033')
+            this.updateStatus('Settings error', 'danger', true)
           }
         },
         onerror: () => {
-          this.updateStatus('CONN FAILED', '#ff0033')
+          this.updateStatus('Local app offline', 'danger')
         },
       })
     },
@@ -201,22 +225,32 @@
       this.updateSettingsButtons()
     },
 
-    updateSettingsButtons() {
-      if (!this.imageBtn) return
+    updateModeButton() {
+      if (!this.forceBtn) return
 
-      const enabled = this.settings.download_images
-      this.imageBtn.innerText = enabled ? '[IMG:ON]' : '[IMG:OFF]'
-      this.imageBtn.style.color = enabled ? '#ff9f00' : '#666'
-      this.imageBtn.style.textShadow = enabled ? '0 0 2px #ff9f00' : 'none'
+      this.forceBtn.innerText = this.isForce ? 'Auto-stop off' : 'Auto-stop on'
+      this.forceBtn.setAttribute('aria-pressed', this.isForce ? 'true' : 'false')
+      this.forceBtn.style.background = this.isForce ? '#fff4e5' : '#eff3f4'
+      this.forceBtn.style.borderColor = this.isForce ? '#f4a62a' : '#cfd9de'
+      this.forceBtn.style.color = '#0f1419'
     },
 
-    toggleImages() {
-      const next = {
-        media_dir: this.settings.media_dir,
-        download_videos: true,
-        download_images: !this.settings.download_images,
-      }
+    updateSettingsButtons() {
+      if (!this.videoBtn || !this.imageBtn) return
 
+      this.updateDownloadButton(this.videoBtn, 'Download videos', this.settings.download_videos)
+      this.updateDownloadButton(this.imageBtn, 'Download images', this.settings.download_images)
+    },
+
+    updateDownloadButton(button, label, enabled) {
+      button.innerText = `${label}: ${enabled ? 'on' : 'off'}`
+      button.setAttribute('aria-pressed', enabled ? 'true' : 'false')
+      button.style.background = enabled ? '#e6f4ea' : '#eff3f4'
+      button.style.borderColor = enabled ? '#79c083' : '#cfd9de'
+      button.style.color = '#0f1419'
+    },
+
+    saveSettings(next, successText) {
       GM_xmlhttpRequest({
         method: 'POST',
         url: SETTINGS_URL,
@@ -225,15 +259,35 @@
         onload: (response) => {
           try {
             this.applySettings(JSON.parse(response.responseText))
-            this.updateStatus(this.settings.download_images ? 'IMG:ON' : 'IMG:OFF', '#888')
+            this.updateStatus(successText, 'neutral', true)
           } catch (e) {
-            this.updateStatus('SETTINGS ERR', '#ff0033')
+            this.updateStatus('Settings error', 'danger', true)
           }
         },
         onerror: () => {
-          this.updateStatus('SAVE FAILED', '#ff0033')
+          this.updateStatus('Could not save', 'danger', true)
         },
       })
+    },
+
+    toggleVideos() {
+      const next = {
+        media_dir: this.settings.media_dir,
+        download_videos: !this.settings.download_videos,
+        download_images: this.settings.download_images !== false,
+      }
+
+      this.saveSettings(next, next.download_videos ? 'Video downloads on' : 'Video downloads off')
+    },
+
+    toggleImages() {
+      const next = {
+        media_dir: this.settings.media_dir,
+        download_videos: this.settings.download_videos !== false,
+        download_images: !this.settings.download_images,
+      }
+
+      this.saveSettings(next, next.download_images ? 'Image downloads on' : 'Image downloads off')
     },
   }
 
@@ -275,7 +329,7 @@
 
   PageXHR.prototype.open = function (method, url) {
     try {
-      this._gemini_url = url
+      this._tbd_url = url
     } catch (e) {}
     return originalOpen.apply(this, arguments)
   }
@@ -284,7 +338,7 @@
     const self = this
     const onLoad = function () {
       self.removeEventListener('load', onLoad)
-      const url = self._gemini_url
+      const url = self._tbd_url
 
       if (typeof url === 'string' && url.includes('Bookmarks') && url.includes('graphql')) {
         const responseData = self.responseText
@@ -300,20 +354,24 @@
                 if (res.duplicate_limit_reached) {
                   if (!UI.isForceMode()) {
                     Scroller.stop()
-                    UI.updateStatus('LIMIT REACHED', '#ff0033')
+                    UI.updateStatus('Stopped at repeats', 'warning')
                   } else {
-                    // Silent continuation in Force Mode
+                    UI.updateStatus(`Saved ${res.saved_count} new`, 'success', true)
                     console.log(`[TBD] Limit hit (Force). Saved: ${res.saved_count}`)
                   }
                 } else {
-                  UI.updateStatus(`SAVED:${res.saved_count}`, '#0f0')
+                  UI.updateStatus(
+                    `Saved ${res.saved_count} new`,
+                    res.saved_count > 0 ? 'success' : 'neutral',
+                    true
+                  )
                 }
               } catch (e) {
-                UI.updateStatus('BACKEND ERR', '#ff0033')
+                UI.updateStatus('Server error', 'danger', true)
               }
             },
             onerror: function (err) {
-              UI.updateStatus('CONN FAILED', '#ff0033')
+              UI.updateStatus('Local app offline', 'danger')
             },
           })
         }
