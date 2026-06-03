@@ -49,7 +49,7 @@ https://x.com/i/bookmarks
 3. 页面左下角会出现 TBD 控制面板：
 
 - `Start sync` / `Stop sync`：开始或停止自动向下滚动并同步书签
-- `Auto-stop on`：遇到连续重复书签后自动停止
+- `Auto-stop on`：遇到连续几批都只有重复书签后自动停止，适合日常增量更新
 - `Auto-stop off`：忽略重复并继续向下滚动，适合深度重扫
 - `Download videos: on/off`：控制是否下载视频
 - `Download images: on/off`：控制是否下载图片

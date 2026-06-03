@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bookmarks Sync to Local
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  Intercept XHR to sync bookmarks and provide Auto-Scroll feature.
 // @author       TBD
 // @match        https://x.com/*
@@ -16,8 +16,9 @@
   'use strict'
   const RAW_SYNC_URL = 'http://localhost:41008/api/sync-raw'
   const SETTINGS_URL = 'http://localhost:41008/api/settings'
+  const AUTO_STOP_DUPLICATE_BATCHES = 3
 
-  console.log('[TBD v0.6] Overlay loaded.')
+  console.log('[TBD v0.7] Overlay loaded.')
 
   const UI = {
     el: null,
@@ -294,6 +295,7 @@
   const Scroller = {
     active: false,
     timer: null,
+    duplicateOnlyBatches: 0,
 
     toggle() {
       if (this.active) this.stop()
@@ -303,6 +305,7 @@
     start() {
       if (this.active) return
       this.active = true
+      this.duplicateOnlyBatches = 0
       UI.setScrolling(true)
       this.loop()
     },
@@ -310,8 +313,18 @@
     stop() {
       if (!this.active) return
       this.active = false
+      this.duplicateOnlyBatches = 0
       clearTimeout(this.timer)
       UI.setScrolling(false)
+    },
+
+    resetDuplicateOnlyBatches() {
+      this.duplicateOnlyBatches = 0
+    },
+
+    noteDuplicateOnlyBatch() {
+      this.duplicateOnlyBatches += 1
+      return this.duplicateOnlyBatches
     },
 
     loop() {
@@ -351,18 +364,33 @@
             onload: function (response) {
               try {
                 const res = JSON.parse(response.responseText)
+                const savedCount = Number(res.saved_count) || 0
+
+                if (savedCount > 0) {
+                  Scroller.resetDuplicateOnlyBatches()
+                }
+
                 if (res.duplicate_limit_reached) {
                   if (!UI.isForceMode()) {
-                    Scroller.stop()
-                    UI.updateStatus('Stopped at repeats', 'warning')
+                    if (savedCount > 0) {
+                      UI.updateStatus(`Saved ${savedCount} new`, 'success', true)
+                    } else {
+                      const duplicateBatches = Scroller.noteDuplicateOnlyBatch()
+                      if (duplicateBatches >= AUTO_STOP_DUPLICATE_BATCHES) {
+                        Scroller.stop()
+                        UI.updateStatus('Stopped at repeats', 'warning')
+                      } else {
+                        UI.updateStatus(`Checking deeper ${duplicateBatches}/${AUTO_STOP_DUPLICATE_BATCHES}`, 'warning', true)
+                      }
+                    }
                   } else {
-                    UI.updateStatus(`Saved ${res.saved_count} new`, 'success', true)
-                    console.log(`[TBD] Limit hit (Force). Saved: ${res.saved_count}`)
+                    UI.updateStatus(`Saved ${savedCount} new`, 'success', true)
+                    console.log(`[TBD] Limit hit (Force). Saved: ${savedCount}`)
                   }
                 } else {
                   UI.updateStatus(
-                    `Saved ${res.saved_count} new`,
-                    res.saved_count > 0 ? 'success' : 'neutral',
+                    `Saved ${savedCount} new`,
+                    savedCount > 0 ? 'success' : 'neutral',
                     true
                   )
                 }
