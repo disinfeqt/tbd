@@ -18,7 +18,7 @@ func StartServer(addr string) error {
 	http.HandleFunc("/api/sync-raw", handleSyncRaw)
 	http.HandleFunc("/api/settings", handleSettings)
 
-	PrintInfoF("Server starting on %s...", addr)
+	PrintInfoF("TBD is ready — open https://x.com/i/history and keep this window running (listening on http://localhost%s)", addr)
 	return http.ListenAndServe(addr, nil)
 }
 
@@ -35,7 +35,7 @@ func handleSyncRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	PrintInfoF("Receiving raw GraphQL response from client (%s)...", r.RemoteAddr)
+	PrintInfo("Received a batch of bookmarks from the browser")
 
 	var fullResponse json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&fullResponse); err != nil {

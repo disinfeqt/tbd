@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"time"
 
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -91,9 +92,9 @@ func ProcessSyncRaw(fullJSON json.RawMessage) SyncResponse {
 	}
 
 	if len(rawTweets) == 0 {
-		PrintWarningF("No tweets extracted. Found instruction types: %v", foundTypes)
+		PrintWarningF("No tweets found in this batch (instruction types: %v)", foundTypes)
 	} else {
-		PrintInfoF("Extracted %d tweets from raw GraphQL response", len(rawTweets))
+		PrintInfoF("Batch contains %d bookmarks, checking for new ones...", len(rawTweets))
 	}
 
 	// 3. Normalize the tweet objects.
@@ -119,19 +120,23 @@ func ProcessSyncRaw(fullJSON json.RawMessage) SyncResponse {
 // processRawTweetResults iterates over individual tweet JSON objects, extracts metadata,
 // checks for duplicates, and saves them to the database.
 func processRawTweetResults(results []json.RawMessage) SyncResponse {
-	savedCount := 0
-	duplicateStreak := 0
-	duplicateLimitReached := false
-
-	// Debug info for sparse saves
-	type savedInfo struct {
-		URL        string
-		MediaFiles []string
+	// 1. Parse every tweet up front so duplicates can be checked in one query
+	// and all inserts can share one transaction.
+	type parsedTweet struct {
+		raw        json.RawMessage
+		id         string
+		name       string
+		screenName string
+		fullText   string
+		createdAt  string
+		media      []tweetMediaEntity
 	}
-	var savedDebug []savedInfo
+
+	parsed := make([]parsedTweet, 0, len(results))
+	ids := make([]string, 0, len(results))
 
 	for _, res := range results {
-		// 1. Parse minimal fields required for indexing using a comprehensive struct matching common patterns.
+		// Parse minimal fields required for indexing using a comprehensive struct matching common patterns.
 		var tweet struct {
 			Legacy struct {
 				IDStr            string `json:"id_str"`
@@ -166,7 +171,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			continue
 		}
 
-		// 2. Extract Screen Name with fallback logic.
+		// Extract Screen Name with fallback logic.
 		// Try legacy path first, then core path.
 		screenName := tweet.Core.UserResults.Result.Legacy.ScreenName
 		if screenName == "" {
@@ -189,67 +194,114 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			}
 		}
 
-		// 3. Check for duplicates in the database.
-		var exists int64
-		DB.Model(&TweetModel{}).Where("id = ?", tweetID).Count(&exists)
-		if exists > 0 {
-			backfilled, err := createMissingMedia(tweetID, tweet.Legacy.ExtendedEntities.Media)
-			if err != nil {
-				PrintError(err)
-			} else if backfilled > 0 {
-				PrintInfoF("Backfilled %d media records for existing tweet %s", backfilled, tweetID)
-			}
+		parsed = append(parsed, parsedTweet{
+			raw:        res,
+			id:         tweetID,
+			name:       name,
+			screenName: screenName,
+			fullText:   tweet.Legacy.FullText,
+			createdAt:  tweet.Legacy.CreatedAt,
+			media:      tweet.Legacy.ExtendedEntities.Media,
+		})
+		ids = append(ids, tweetID)
+	}
 
-			duplicateStreak++
-			if duplicateStreak >= DUPLICATE_THRESHOLD {
-				duplicateLimitReached = true
-			}
-			continue
+	// 2. Check for duplicates with a single IN query instead of one query per tweet.
+	existing := make(map[string]struct{}, len(ids))
+	if len(ids) > 0 {
+		var existingIDs []string
+		if err := DB.Model(&TweetModel{}).Where("id IN ?", ids).Pluck("id", &existingIDs).Error; err != nil {
+			PrintError(err)
 		}
-		duplicateStreak = 0
-
-		// 4. Parse creation time.
-		createdAt, _ := time.Parse(time.RubyDate, tweet.Legacy.CreatedAt)
-		if createdAt.IsZero() {
-			createdAt = time.Now()
-		}
-
-		// 5. Construct the TweetModel and MediaModels
-		// Note: We store the raw JSON payload to allow for future re-processing or data recovery.
-		tm := &TweetModel{
-			ID:           tweetID,
-			FullText:     tweet.Legacy.FullText,
-			Name:         name,
-			ScreenName:   screenName,
-			CreatedAt:    createdAt,
-			PermanentURL: "https://x.com/" + screenName + "/status/" + tweetID,
-			RawJSON:      string(res),
-			SyncedAt:     time.Now(),
-		}
-
-		var mediaFilenames []string
-		mediaCount := len(tweet.Legacy.ExtendedEntities.Media)
-		tm.Media = mediaModelsForTweet(tweetID, tweet.Legacy.ExtendedEntities.Media)
-
-		for _, media := range tm.Media {
-			// Generate simulated filename for debug
-			if shouldDownloadMedia(media) {
-				if parsedURL, err := url.Parse(media.URL); err == nil {
-					mediaFilenames = append(mediaFilenames, buildFilename(tm, media.Index, mediaCount, parsedURL))
-				}
-			}
-		}
-
-		if err := DB.Create(tm).Error; err == nil {
-			savedCount++
-			savedDebug = append(savedDebug, savedInfo{
-				URL:        tm.PermanentURL,
-				MediaFiles: mediaFilenames,
-			})
+		for _, id := range existingIDs {
+			existing[id] = struct{}{}
 		}
 	}
 
-	PrintInfoF("Batch processing complete: %d new tweets saved. (Duplicate limit reached: %v)", savedCount, duplicateLimitReached)
+	savedCount := 0
+	duplicateStreak := 0
+	duplicateLimitReached := false
+
+	// Debug info for sparse saves
+	type savedInfo struct {
+		URL        string
+		MediaFiles []string
+	}
+	var savedDebug []savedInfo
+
+	// 3. Save the whole batch inside one transaction: SQLite commits (and fsyncs)
+	// once per batch instead of once per tweet.
+	txErr := DB.Transaction(func(tx *gorm.DB) error {
+		for _, pt := range parsed {
+			if _, isDuplicate := existing[pt.id]; isDuplicate {
+				backfilled, err := createMissingMedia(tx, pt.id, pt.media)
+				if err != nil {
+					PrintError(err)
+				} else if backfilled > 0 {
+					PrintInfoF("Backfilled %d media records for existing tweet %s", backfilled, pt.id)
+				}
+
+				duplicateStreak++
+				if duplicateStreak >= DUPLICATE_THRESHOLD {
+					duplicateLimitReached = true
+				}
+				continue
+			}
+			duplicateStreak = 0
+
+			// Parse creation time.
+			createdAt, _ := time.Parse(time.RubyDate, pt.createdAt)
+			if createdAt.IsZero() {
+				createdAt = time.Now()
+			}
+
+			// Construct the TweetModel and MediaModels
+			// Note: We store the raw JSON payload to allow for future re-processing or data recovery.
+			tm := &TweetModel{
+				ID:           pt.id,
+				FullText:     pt.fullText,
+				Name:         pt.name,
+				ScreenName:   pt.screenName,
+				CreatedAt:    createdAt,
+				PermanentURL: "https://x.com/" + pt.screenName + "/status/" + pt.id,
+				RawJSON:      string(pt.raw),
+				SyncedAt:     time.Now(),
+			}
+
+			var mediaFilenames []string
+			mediaCount := len(pt.media)
+			tm.Media = mediaModelsForTweet(pt.id, pt.media)
+
+			for _, media := range tm.Media {
+				// Generate simulated filename for debug
+				if shouldDownloadMedia(media) {
+					if parsedURL, err := url.Parse(media.URL); err == nil {
+						mediaFilenames = append(mediaFilenames, buildFilename(tm, media.Index, mediaCount, parsedURL))
+					}
+				}
+			}
+
+			if err := tx.Create(tm).Error; err == nil {
+				savedCount++
+				existing[pt.id] = struct{}{} // A repeated ID later in this batch counts as a duplicate.
+				savedDebug = append(savedDebug, savedInfo{
+					URL:        tm.PermanentURL,
+					MediaFiles: mediaFilenames,
+				})
+			}
+		}
+		return nil
+	})
+	if txErr != nil {
+		PrintError(txErr)
+		return SyncResponse{Success: false, Message: "Database error"}
+	}
+
+	if savedCount > 0 {
+		NudgeDownloadWorker()
+	}
+
+	PrintInfoF("Batch done: %d new bookmarks saved", savedCount)
 
 	// Debug: Identify why we are saving items after hitting duplicate limit
 	if duplicateLimitReached && savedCount > 0 {
@@ -290,12 +342,12 @@ func mediaModelsForTweet(tweetID string, entities []tweetMediaEntity) []MediaMod
 	return mediaModels
 }
 
-func createMissingMedia(tweetID string, entities []tweetMediaEntity) (int64, error) {
+func createMissingMedia(db *gorm.DB, tweetID string, entities []tweetMediaEntity) (int64, error) {
 	mediaModels := mediaModelsForTweet(tweetID, entities)
 	if len(mediaModels) == 0 {
 		return 0, nil
 	}
 
-	result := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&mediaModels)
+	result := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&mediaModels)
 	return result.RowsAffected, result.Error
 }

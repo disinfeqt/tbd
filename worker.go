@@ -10,11 +10,23 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rotisserie/eris"
 	"gorm.io/gorm"
 )
+
+// downloadNudge lets the sync handler wake the worker as soon as new media
+// arrives instead of waiting for the next poll tick.
+var downloadNudge = make(chan struct{}, 1)
+
+func NudgeDownloadWorker() {
+	select {
+	case downloadNudge <- struct{}{}:
+	default: // A wake-up is already queued.
+	}
+}
 
 func StartDownloadWorker() {
 	PrintInfo("Download worker started")
@@ -28,6 +40,8 @@ func StartDownloadWorker() {
 	for {
 		select {
 		case <-ticker.C:
+			DownloadPendingMedia()
+		case <-downloadNudge:
 			DownloadPendingMedia()
 		case <-statusTicker.C:
 			ReportWorkerStatus(false)
@@ -52,9 +66,9 @@ func ReportWorkerStatus(force bool) {
 	}
 
 	if force || pending > 0 || paused > 0 || failed > 0 {
-		PrintInfoF("[Worker Status] Pending: %d | Paused by settings: %d | Failed: %d", pending, paused, failed)
+		PrintInfoF("Downloads — waiting: %d · paused by settings: %d · failed: %d", pending, paused, failed)
 		if failed > 0 {
-			PrintWarningF("  %d media items failed permanently after multiple retries.", failed)
+			PrintWarningF("%d media items gave up after multiple retries", failed)
 		}
 	}
 }
@@ -75,7 +89,22 @@ func pendingDownloadQuery() *gorm.DB {
 	}
 }
 
+// maxConcurrentDownloads keeps small images flowing while a large video downloads,
+// without saturating the connection.
+const maxConcurrentDownloads = 3
+
 func DownloadPendingMedia() {
+	// Fetch the batch first so the idle path (no pending media) costs one query.
+	var mediaList []MediaModel
+	// Find up to 5 pending downloads
+	if err := pendingDownloadQuery().Limit(5).Find(&mediaList).Error; err != nil {
+		PrintError(eris.Wrap(err, "Failed to query pending media"))
+		return
+	}
+	if len(mediaList) == 0 {
+		return
+	}
+
 	var total int64
 	var pending int64
 	if err := DB.Model(&MediaModel{}).Count(&total).Error; err != nil {
@@ -87,44 +116,65 @@ func DownloadPendingMedia() {
 		return
 	}
 
-	var mediaList []MediaModel
-	// Find up to 5 pending downloads
-	err := pendingDownloadQuery().Limit(5).Find(&mediaList).Error
-	if err != nil {
-		PrintError(eris.Wrap(err, "Failed to query pending media"))
-		return
-	}
-
-	if len(mediaList) == 0 {
-		return
+	// One media-count query per tweet, shared by every item in the batch.
+	mediaCounts := make(map[string]int64, len(mediaList))
+	for _, media := range mediaList {
+		if _, ok := mediaCounts[media.TweetID]; ok {
+			continue
+		}
+		var count int64
+		if err := DB.Model(&MediaModel{}).Where("tweet_id = ?", media.TweetID).Count(&count).Error; err != nil {
+			PrintError(eris.Wrap(err, "Failed to count tweet media"))
+			continue
+		}
+		mediaCounts[media.TweetID] = count
 	}
 
 	completed := total - pending
-	for i, media := range mediaList {
+	sem := make(chan struct{}, maxConcurrentDownloads)
+	var wg sync.WaitGroup
+
+	for i := range mediaList {
+		media := &mediaList[i]
 		progressLabel := fmt.Sprintf("%d/%d", completed+int64(i)+1, total)
-		if !shouldDownloadMedia(media) {
+		if !shouldDownloadMedia(*media) {
 			continue
 		}
+		mediaCount, ok := mediaCounts[media.TweetID]
+		if !ok {
+			continue // Count query failed above; the item stays pending for the next tick.
+		}
 
-		err := processMediaDownload(&media, progressLabel)
-		if err != nil {
-			PrintError(eris.Wrapf(err, "Media ID: %s", media.ID))
-			media.RetryCount++
-			if media.RetryCount >= 3 {
-				media.Failed = true
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(media *MediaModel, progressLabel string, mediaCount int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			err := processMediaDownload(media, progressLabel, mediaCount)
+			if err != nil {
+				PrintError(eris.Wrapf(err, "Media ID: %s", media.ID))
+				media.RetryCount++
+				if media.RetryCount >= 3 {
+					media.Failed = true
+				}
+			} else {
+				media.Downloaded = true
 			}
-		} else {
-			media.Downloaded = true
-		}
-		if err := DB.Save(&media).Error; err != nil {
-			PrintError(eris.Wrapf(err, "Failed to update media status for %s", media.ID))
-		}
+			if err := DB.Save(media).Error; err != nil {
+				PrintError(eris.Wrapf(err, "Failed to update media status for %s", media.ID))
+			}
+		}(media, progressLabel, int(mediaCount))
 	}
+	wg.Wait()
 }
 
-func processMediaDownload(media *MediaModel, progressLabel string) error {
+func processMediaDownload(media *MediaModel, progressLabel string, mediaCount int) error {
+	// Select only the columns buildFilename and logging need; RawJSON holds the
+	// full GraphQL payload and would dominate the read otherwise.
 	var tweet TweetModel
-	if err := DB.First(&tweet, "id = ?", media.TweetID).Error; err != nil {
+	if err := DB.Select("id", "screen_name", "created_at", "permanent_url").
+		First(&tweet, "id = ?", media.TweetID).Error; err != nil {
 		return eris.Wrap(err, "Tweet not found for media")
 	}
 
@@ -140,13 +190,7 @@ func processMediaDownload(media *MediaModel, progressLabel string) error {
 		parsedURL.RawQuery = params.Encode()
 	}
 
-	// Determine total media count for this tweet
-	var mediaCount int64
-	if err := DB.Model(&MediaModel{}).Where("tweet_id = ?", tweet.ID).Count(&mediaCount).Error; err != nil {
-		return eris.Wrap(err, "Failed to count tweet media")
-	}
-
-	filename := buildFilename(&tweet, media.Index, int(mediaCount), parsedURL)
+	filename := buildFilename(&tweet, media.Index, mediaCount, parsedURL)
 	outputPath := filepath.Join(CurrentConfig().MediaDir, filename)
 
 	if err := downloadFile(parsedURL.String(), outputPath, tweet.CreatedAt, progressLabel); err != nil {

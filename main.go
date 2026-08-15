@@ -30,7 +30,7 @@ func main() {
 	if err != nil {
 		FatalError(eris.Wrap(err, "Failed to init DB"))
 	}
-	PrintInfo("Database initialized successfully")
+	PrintInfo("Database ready")
 
 	if *exportHandles {
 		count, err := ExportUniqueHandles(*handlesOutput)

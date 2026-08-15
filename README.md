@@ -7,7 +7,7 @@ TBD 用来把 X/Twitter 书签同步到本地，并下载书签里的媒体文�
 它由两部分组成：
 
 - 本地 Go 服务：保存书签到 `bookmarks.db`，下载媒体到 `media/`
-- Tampermonkey 用户脚本：在 `x.com/i/bookmarks` 页面捕获浏览器收到的书签数据并发送给本地服务
+- Tampermonkey 用户脚本：在 `x.com/i/history` 页面捕获浏览器收到的书签数据并发送给本地服务
 
 默认下载视频和图片。图片下载可以在页面左下角控制面板里关闭。
 
@@ -43,16 +43,17 @@ go build -o tbd .
 2. 打开 X/Twitter 书签页：
 
 ```text
-https://x.com/i/bookmarks
+https://x.com/i/history
 ```
 
 3. 页面左下角会出现 TBD 控制面板：
 
 - `Start sync` / `Stop sync`：开始或停止自动向下滚动并同步书签
-- `Auto-stop on`：遇到连续几批都只有重复书签后自动停止，适合日常增量更新
-- `Auto-stop off`：忽略重复并继续向下滚动，适合深度重扫
-- `Download videos: on/off`：控制是否下载视频
-- `Download images: on/off`：控制是否下载图片
+- `Auto-stop` 开关：开启时遇到连续几批都只有重复书签后自动停止，适合日常增量更新；关闭时忽略重复并继续向下滚动，适合深度重扫
+- `Download videos` 开关：控制是否下载视频
+- `Download images` 开关：控制是否下载图片
+
+面板会自动跟随 X 的浅色/深色主题。
 
 4. 下载结果：
 
@@ -97,7 +98,7 @@ https://x.com/i/bookmarks
 - Tampermonkey 扩展已启用
 - 脚本已启用
 - Tampermonkey 设置里的 **Allow User Scripts** 已启用
-- 当前页面是 `https://x.com/i/bookmarks`
+- 当前页面是 `https://x.com/i/history`（旧地址 `https://x.com/i/bookmarks` 也支持）
 
 ### 有待下载数量，但暂时看不到新文件
 
