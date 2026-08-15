@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"net/http"
@@ -9,14 +9,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"twitter-bookmarks-downloader/internal/config"
 )
 
 func TestHandleSettingsGetAndPost(t *testing.T) {
-	withTestConfig(t, Config{
+	t.Cleanup(config.SwapForTest(config.Config{
 		MediaDir:       "media",
 		DownloadVideos: true,
 		DownloadImages: true,
-	})
+	}))
 
 	originalCwd, err := os.Getwd()
 	require.NoError(t, err)
@@ -37,8 +39,8 @@ func TestHandleSettingsGetAndPost(t *testing.T) {
 	handleSettings(postRecorder, req)
 	require.Equal(t, http.StatusOK, postRecorder.Code)
 	assert.Contains(t, postRecorder.Body.String(), `"download_images":false`)
-	assert.False(t, CurrentConfig().DownloadImages)
+	assert.False(t, config.Current().DownloadImages)
 
-	_, err = os.Stat(configPath)
+	_, err = os.Stat(config.DefaultPath)
 	require.NoError(t, err)
 }

@@ -1,4 +1,5 @@
-package main
+// Package syncer turns raw GraphQL bookmark responses into database rows.
+package syncer
 
 import (
 	"encoding/json"
@@ -8,6 +9,11 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"twitter-bookmarks-downloader/internal/download"
+	"twitter-bookmarks-downloader/internal/logx"
+	"twitter-bookmarks-downloader/internal/store"
+	"twitter-bookmarks-downloader/internal/twitter"
 )
 
 /*
@@ -37,7 +43,14 @@ Our Parsing Strategy (in processRawTweetResults):
     This is crucial for data integrity and allows fixing parsing logic later without losing data.
 */
 
-const DUPLICATE_THRESHOLD = 5 // Stop syncing if we encounter this many existing tweets in a row
+const DuplicateThreshold = 5 // Stop syncing if we encounter this many existing tweets in a row
+
+type SyncResponse struct {
+	Success               bool   `json:"success"`
+	Message               string `json:"message"`
+	DuplicateLimitReached bool   `json:"duplicate_limit_reached"`
+	SavedCount            int    `json:"saved_count"`
+}
 
 // screenNameRegex is our last line of defense to extract the username if JSON structural parsing fails.
 var screenNameRegex = regexp.MustCompile(`"screen_name"\s*:\s*"([^"]+)"`)
@@ -60,7 +73,7 @@ func ProcessSyncRaw(fullJSON json.RawMessage) SyncResponse {
 	}
 
 	if err := json.Unmarshal(fullJSON, &resp); err != nil {
-		PrintError(err)
+		logx.Error(err)
 		return SyncResponse{Success: false, Message: "JSON unmarshal error"}
 	}
 
@@ -92,9 +105,9 @@ func ProcessSyncRaw(fullJSON json.RawMessage) SyncResponse {
 	}
 
 	if len(rawTweets) == 0 {
-		PrintWarningF("No tweets found in this batch (instruction types: %v)", foundTypes)
+		logx.Warnf("No tweets found in this batch (instruction types: %v)", foundTypes)
 	} else {
-		PrintInfoF("Batch contains %d bookmarks, checking for new ones...", len(rawTweets))
+		logx.Infof("Batch contains %d bookmarks, checking for new ones...", len(rawTweets))
 	}
 
 	// 3. Normalize the tweet objects.
@@ -129,7 +142,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		screenName string
 		fullText   string
 		createdAt  string
-		media      []tweetMediaEntity
+		media      []twitter.MediaEntity
 	}
 
 	parsed := make([]parsedTweet, 0, len(results))
@@ -143,7 +156,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 				FullText         string `json:"full_text"`
 				CreatedAt        string `json:"created_at"`
 				ExtendedEntities struct {
-					Media []tweetMediaEntity `json:"media"`
+					Media []twitter.MediaEntity `json:"media"`
 				} `json:"extended_entities"`
 			} `json:"legacy"`
 			Core struct {
@@ -188,9 +201,9 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			matches := screenNameRegex.FindStringSubmatch(string(res))
 			if len(matches) > 1 {
 				screenName = matches[1]
-				PrintWarningF("Recovered ScreenName via regex for tweet %s: %s", tweetID, screenName)
+				logx.Warnf("Recovered ScreenName via regex for tweet %s: %s", tweetID, screenName)
 			} else {
-				PrintWarningF("Failed to extract ScreenName for tweet %s", tweetID)
+				logx.Warnf("Failed to extract ScreenName for tweet %s", tweetID)
 			}
 		}
 
@@ -210,8 +223,8 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 	existing := make(map[string]struct{}, len(ids))
 	if len(ids) > 0 {
 		var existingIDs []string
-		if err := DB.Model(&TweetModel{}).Where("id IN ?", ids).Pluck("id", &existingIDs).Error; err != nil {
-			PrintError(err)
+		if err := store.DB.Model(&store.TweetModel{}).Where("id IN ?", ids).Pluck("id", &existingIDs).Error; err != nil {
+			logx.Error(err)
 		}
 		for _, id := range existingIDs {
 			existing[id] = struct{}{}
@@ -231,18 +244,18 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 
 	// 3. Save the whole batch inside one transaction: SQLite commits (and fsyncs)
 	// once per batch instead of once per tweet.
-	txErr := DB.Transaction(func(tx *gorm.DB) error {
+	txErr := store.DB.Transaction(func(tx *gorm.DB) error {
 		for _, pt := range parsed {
 			if _, isDuplicate := existing[pt.id]; isDuplicate {
 				backfilled, err := createMissingMedia(tx, pt.id, pt.media)
 				if err != nil {
-					PrintError(err)
+					logx.Error(err)
 				} else if backfilled > 0 {
-					PrintInfoF("Backfilled %d media records for existing tweet %s", backfilled, pt.id)
+					logx.Infof("Backfilled %d media records for existing tweet %s", backfilled, pt.id)
 				}
 
 				duplicateStreak++
-				if duplicateStreak >= DUPLICATE_THRESHOLD {
+				if duplicateStreak >= DuplicateThreshold {
 					duplicateLimitReached = true
 				}
 				continue
@@ -257,7 +270,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 
 			// Construct the TweetModel and MediaModels
 			// Note: We store the raw JSON payload to allow for future re-processing or data recovery.
-			tm := &TweetModel{
+			tm := &store.TweetModel{
 				ID:           pt.id,
 				FullText:     pt.fullText,
 				Name:         pt.name,
@@ -274,9 +287,9 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 
 			for _, media := range tm.Media {
 				// Generate simulated filename for debug
-				if shouldDownloadMedia(media) {
+				if download.ShouldDownload(media) {
 					if parsedURL, err := url.Parse(media.URL); err == nil {
-						mediaFilenames = append(mediaFilenames, buildFilename(tm, media.Index, mediaCount, parsedURL))
+						mediaFilenames = append(mediaFilenames, download.BuildFilename(tm, media.Index, mediaCount, parsedURL))
 					}
 				}
 			}
@@ -293,22 +306,22 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		return nil
 	})
 	if txErr != nil {
-		PrintError(txErr)
+		logx.Error(txErr)
 		return SyncResponse{Success: false, Message: "Database error"}
 	}
 
 	if savedCount > 0 {
-		NudgeDownloadWorker()
+		download.Nudge()
 	}
 
-	PrintInfoF("Batch done: %d new bookmarks saved", savedCount)
+	logx.Infof("Batch done: %d new bookmarks saved", savedCount)
 
 	// Debug: Identify why we are saving items after hitting duplicate limit
 	if duplicateLimitReached && savedCount > 0 {
 		for _, info := range savedDebug {
-			PrintWarningF("  [Sparse Save] URL: %s", info.URL)
+			logx.Warnf("  [Sparse Save] URL: %s", info.URL)
 			for _, mf := range info.MediaFiles {
-				PrintWarningF("                Media: %s", mf)
+				logx.Warnf("                Media: %s", mf)
 			}
 		}
 	}
@@ -321,16 +334,16 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 	}
 }
 
-func mediaModelsForTweet(tweetID string, entities []tweetMediaEntity) []MediaModel {
-	mediaModels := make([]MediaModel, 0, len(entities))
+func mediaModelsForTweet(tweetID string, entities []twitter.MediaEntity) []store.MediaModel {
+	mediaModels := make([]store.MediaModel, 0, len(entities))
 
 	for i, m := range entities {
-		downloadURL := downloadURLForMedia(m)
+		downloadURL := twitter.DownloadURLForMedia(m)
 		if downloadURL == "" {
 			continue
 		}
 
-		mediaModels = append(mediaModels, MediaModel{
+		mediaModels = append(mediaModels, store.MediaModel{
 			ID:      m.IDStr,
 			TweetID: tweetID,
 			Index:   i,
@@ -342,7 +355,7 @@ func mediaModelsForTweet(tweetID string, entities []tweetMediaEntity) []MediaMod
 	return mediaModels
 }
 
-func createMissingMedia(db *gorm.DB, tweetID string, entities []tweetMediaEntity) (int64, error) {
+func createMissingMedia(db *gorm.DB, tweetID string, entities []twitter.MediaEntity) (int64, error) {
 	mediaModels := mediaModelsForTweet(tweetID, entities)
 	if len(mediaModels) == 0 {
 		return 0, nil

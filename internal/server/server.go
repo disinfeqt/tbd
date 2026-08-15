@@ -1,31 +1,31 @@
-package main
+// Package server exposes the local HTTP API used by the userscript and the
+// bookmark explorer dashboard.
+package server
 
 import (
 	"encoding/json"
 	"net/http"
 
 	"github.com/rotisserie/eris"
+
+	"twitter-bookmarks-downloader/internal/config"
+	"twitter-bookmarks-downloader/internal/logx"
+	"twitter-bookmarks-downloader/internal/syncer"
 )
 
-type SyncResponse struct {
-	Success               bool   `json:"success"`
-	Message               string `json:"message"`
-	DuplicateLimitReached bool   `json:"duplicate_limit_reached"`
-	SavedCount            int    `json:"saved_count"`
-}
-
-func StartServer(addr string) error {
+func Start(addr string) error {
 	http.HandleFunc("/api/sync-raw", handleSyncRaw)
 	http.HandleFunc("/api/settings", handleSettings)
+	registerExploreRoutes()
 
-	PrintInfoF("TBD is ready — open https://x.com/i/history and keep this window running (listening on http://localhost%s)", addr)
+	logx.Infof("TBD is ready — dashboard at http://localhost:41008 · keep this window running")
 	return http.ListenAndServe(addr, nil)
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		PrintError(eris.Wrap(err, "Failed to encode JSON response"))
+		logx.Error(eris.Wrap(err, "Failed to encode JSON response"))
 	}
 }
 
@@ -35,16 +35,16 @@ func handleSyncRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	PrintInfo("Received a batch of bookmarks from the browser")
+	logx.Info("Received a batch of bookmarks from the browser")
 
 	var fullResponse json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&fullResponse); err != nil {
-		PrintError(eris.Wrap(err, "Failed to decode raw sync payload"))
+		logx.Error(eris.Wrap(err, "Failed to decode raw sync payload"))
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	response := ProcessSyncRaw(fullResponse)
+	response := syncer.ProcessSyncRaw(fullResponse)
 	writeJSON(w, response)
 }
 
@@ -59,7 +59,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodGet {
-		writeJSON(w, CurrentConfig())
+		writeJSON(w, config.Current())
 		return
 	}
 
@@ -74,12 +74,12 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		DownloadImages *bool   `json:"download_images"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
-		PrintError(eris.Wrap(err, "Failed to decode settings payload"))
+		logx.Error(eris.Wrap(err, "Failed to decode settings payload"))
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	next := CurrentConfig()
+	next := config.Current()
 	if patch.MediaDir != nil {
 		next.MediaDir = *patch.MediaDir
 	}
@@ -90,11 +90,11 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		next.DownloadImages = *patch.DownloadImages
 	}
 
-	if err := UpdateConfig(configPath, next); err != nil {
-		PrintError(eris.Wrap(err, "Failed to save settings"))
+	if err := config.Update(config.DefaultPath, next); err != nil {
+		logx.Error(eris.Wrap(err, "Failed to save settings"))
 		http.Error(w, "Failed to save settings", http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, CurrentConfig())
+	writeJSON(w, config.Current())
 }

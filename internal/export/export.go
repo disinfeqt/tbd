@@ -1,4 +1,5 @@
-package main
+// Package export writes derived data (unique author handles) to disk.
+package export
 
 import (
 	"encoding/json"
@@ -7,11 +8,13 @@ import (
 	"strings"
 
 	"github.com/rotisserie/eris"
+
+	"twitter-bookmarks-downloader/internal/store"
 )
 
-func ExportUniqueHandles(outputPath string) (int, error) {
+func UniqueHandles(outputPath string) (int, error) {
 	var screenNames []string
-	if err := DB.Model(&TweetModel{}).
+	if err := store.DB.Model(&store.TweetModel{}).
 		Where("screen_name <> ?", "").
 		Pluck("screen_name", &screenNames).Error; err != nil {
 		return 0, eris.Wrap(err, "failed to query screen names")

@@ -1,4 +1,4 @@
-package main
+package export
 
 import (
 	"encoding/json"
@@ -9,16 +9,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"twitter-bookmarks-downloader/internal/store"
 )
 
 func TestExportUniqueHandles(t *testing.T) {
-	originalDB := DB
+	originalDB := store.DB
 	t.Cleanup(func() {
-		DB = originalDB
+		store.DB = originalDB
 	})
 
-	require.NoError(t, InitDB(":memory:"))
-	require.NoError(t, DB.Create(&[]TweetModel{
+	require.NoError(t, store.Init(":memory:"))
+	require.NoError(t, store.DB.Create(&[]store.TweetModel{
 		{
 			ID:         "1",
 			ScreenName: "Alice",
@@ -41,7 +43,7 @@ func TestExportUniqueHandles(t *testing.T) {
 	}).Error)
 
 	outputPath := filepath.Join(t.TempDir(), "handles.json")
-	count, err := ExportUniqueHandles(outputPath)
+	count, err := UniqueHandles(outputPath)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
 

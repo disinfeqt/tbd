@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TBD Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%F0%9F%94%96%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --series: #2a78d6;
+  --series-strong: #1c5cab;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --series: #3987e5;
+    --series-strong: #6da7ec;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+main { max-width: 1120px; margin: 0 auto; padding: 28px 20px 64px; }
+
+header.page { margin-bottom: 20px; }
+header.page h1 { font-size: 22px; font-weight: 700; margin: 0; }
+header.page p { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+/* ---- KPI tiles ---- */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.tile .tlabel { font-size: 12px; color: var(--ink-2); }
+.tile .tvalue { font-size: 28px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
+.tile .tsub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ---- Chart cards ---- */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.chart-card .chead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.chart-card h3 { font-size: 14px; font-weight: 600; margin: 0; }
+.chart-card .csub { font-size: 12px; color: var(--muted); margin: -6px 0 8px; }
+.tbtn {
+  font: inherit; font-size: 12px; color: var(--ink-2);
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 8px; cursor: pointer;
+}
+.tbtn[aria-pressed="true"] { background: var(--grid); color: var(--ink); }
+.cbody { min-height: 40px; }
+.ctable { overflow-x: auto; }
+.ctable table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ctable th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--grid); }
+.ctable td { padding: 4px 8px; border-bottom: 1px solid var(--grid); }
+.ctable td.num, .ctable th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- SVG chart marks ---- */
+svg { display: block; }
+svg text { font-family: inherit; }
+.grid-line { stroke: var(--grid); stroke-width: 1; }
+.baseline-line { stroke: var(--baseline); stroke-width: 1; }
+.tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.xlab { fill: var(--muted); font-size: 11px; }
+.bar { fill: var(--series); }
+.bar.hot { fill: var(--series-strong); }
+.hit { fill: transparent; outline: none; }
+.line-mark { stroke: var(--series); stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.area-mark { fill: var(--series); opacity: 0.1; }
+.dot { fill: var(--series); stroke: var(--surface); stroke-width: 2; }
+.cross { stroke: var(--baseline); stroke-width: 1; }
+.dlabel { fill: var(--ink-2); font-size: 11px; font-weight: 600; }
+
+/* ---- Horizontal bars (HTML) ---- */
+.hrow {
+  display: grid; grid-template-columns: 150px 1fr 48px;
+  align-items: center; gap: 8px; padding: 4px 0; cursor: default;
+  border-radius: 6px;
+}
+.hrow.clickable { cursor: pointer; }
+.hrow.clickable:hover { background: color-mix(in srgb, var(--series) 8%, transparent); }
+.hrow .hlabel { font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrow .htrack { height: 14px; position: relative; }
+.hrow .hbar { position: absolute; inset: 0 auto 0 0; background: var(--series); border-radius: 0 4px 4px 0; min-width: 2px; }
+.hrow.hot .hbar { background: var(--series-strong); }
+.hrow .hval { font-size: 12px; font-weight: 600; color: var(--ink); text-align: left; }
+
+/* ---- Tooltip ---- */
+#tip {
+  position: fixed; z-index: 50; pointer-events: none; display: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  padding: 6px 10px; max-width: 260px;
+}
+#tip .tip-v { font-weight: 600; font-size: 14px; color: var(--ink); }
+#tip .tip-l { font-size: 12px; color: var(--ink-2); }
+
+/* ---- Browse ---- */
+.browse { margin-top: 12px; }
+.bhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.bhead h2 { font-size: 16px; margin: 0; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.controls input, .controls select {
+  font: inherit; color: var(--ink); background: var(--page);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+}
+.controls input { width: 260px; max-width: 60vw; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  background: color-mix(in srgb, var(--series) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--series) 30%, transparent);
+  border-radius: 999px; padding: 2px 6px 2px 10px; font-size: 13px;
+}
+.chip[hidden] { display: none; }
+.chip button { font: inherit; border: none; background: none; cursor: pointer; color: var(--ink-2); padding: 0 4px; }
+#count { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+#list { display: flex; flex-direction: column; gap: 10px; }
+#list.loading { opacity: 0.5; }
+.tweet { border: 1px solid var(--grid); border-radius: 10px; padding: 12px 14px; }
+.tweet .thead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.tweet .tname { font-weight: 600; }
+.tweet .thandle { color: var(--muted); font-size: 13px; cursor: pointer; }
+.tweet .thandle:hover { color: var(--series); }
+.tweet .tdate { color: var(--muted); font-size: 12px; margin-left: auto; }
+.tweet .topen { color: var(--series); font-size: 12px; text-decoration: none; }
+.tweet .topen:hover { text-decoration: underline; }
+.tweet .ttext { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; }
+.mediae { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.mediae img, .mediae video { max-height: 220px; max-width: 100%; border-radius: 8px; border: 1px solid var(--grid); }
+.mchip { font-size: 12px; color: var(--muted); border: 1px dashed var(--baseline); border-radius: 8px; padding: 4px 8px; align-self: flex-start; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
+.pager button {
+  font: inherit; color: var(--ink); background: var(--page);
+  border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+.pager button:disabled { opacity: 0.4; cursor: default; }
+.pager span { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); text-align: center; padding: 24px 0; }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <h1>TBD Explorer</h1>
+    <p id="subtitle">Your X bookmarks archive</p>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <div class="card chart-card" id="c-monthly">
+    <div class="chead"><h3>Bookmarks per month</h3><button class="tbtn" aria-pressed="false">Table</button></div>
+    <p class="csub">By tweet date</p>
+    <div class="cbody"></div>
+    <div class="ctable" hidden></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card chart-card" id="c-hours">
+      <div class="chead"><h3>By hour of day</h3><button class="tbtn" aria-pressed="false">Table</button></div>
+      <p class="csub">Local time of the bookmarked tweet</p>
+      <div class="cbody"></div>
+      <div class="ctable" hidden></div>
+    </div>
+    <div class="card chart-card" id="c-weekdays">
+      <div class="chead"><h3>By day of week</h3><button class="tbtn" aria-pressed="false">Table</button></div>
+      <p class="csub">Local time of the bookmarked tweet</p>
+      <div class="cbody"></div>
+      <div class="ctable" hidden></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card chart-card" id="c-authors">
+      <div class="chead"><h3>Top authors</h3><button class="tbtn" aria-pressed="false">Table</button></div>
+      <p class="csub">Click an author to browse their bookmarks</p>
+      <div class="cbody"></div>
+      <div class="ctable" hidden></div>
+    </div>
+    <div class="card chart-card" id="c-media">
+      <div class="chead"><h3>Media types</h3><button class="tbtn" aria-pressed="false">Table</button></div>
+      <p class="csub">All media records in the archive</p>
+      <div class="cbody"></div>
+      <div class="ctable" hidden></div>
+    </div>
+  </div>
+
+  <section class="card browse">
+    <div class="bhead">
+      <h2>Browse</h2>
+      <div class="controls">
+        <input id="q" type="search" placeholder="Search text, name, or @handle">
+        <select id="sort">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
+    </div>
+    <div id="chip" class="chip" hidden><span></span><button title="Clear author filter">×</button></div>
+    <div id="count"></div>
+    <div id="list"></div>
+    <div class="pager">
+      <button id="prev">← Prev</button>
+      <span id="pageinfo"></span>
+      <button id="next">Next →</button>
+    </div>
+  </section>
+</main>
+<div id="tip"><div class="tip-v"></div><div class="tip-l"></div></div>
+
+<script>
+'use strict';
+const $ = (sel, root) => (root || document).querySelector(sel);
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+function svgEl(tag, attrs) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+const fmt = n => Number(n).toLocaleString('en-US');
+function niceCeil(v) {
+  if (v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 5, 10]) if (m * p >= v) return m * p;
+  return 10 * p;
+}
+
+/* ---- Tooltip: value leads, label follows; textContent only ---- */
+const tip = $('#tip');
+function showTip(x, y, value, label) {
+  $('.tip-v', tip).textContent = value;
+  $('.tip-l', tip).textContent = label;
+  tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let left = x + 12, top = y - r.height - 10;
+  if (left + r.width > innerWidth - 8) left = x - r.width - 12;
+  if (top < 8) top = y + 14;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+
+/* ---- Column chart: rounded data-end, square baseline, band-wide hit targets ---- */
+function roundedTopRect(x, y, w, h, r) {
+  if (h <= 0) return '';
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h} Z`;
+}
+
+function columnChart(container, data, opts = {}) {
+  container.textContent = '';
+  const W = Math.max(container.clientWidth, 220);
+  const H = opts.height || 190;
+  const padL = 38, padR = 10, padT = 18, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const max = niceCeil(Math.max(1, ...data.map(d => d.value)));
+  const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img' });
+
+  for (const v of [max / 2, max]) {
+    const y = padT + plotH * (1 - v / max);
+    svg.append(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'grid-line' }));
+    const t = svgEl('text', { x: padL - 6, y: y + 3.5, class: 'tick', 'text-anchor': 'end' });
+    t.textContent = fmt(v);
+    svg.append(t);
+  }
+  const baseY = padT + plotH;
+  svg.append(svgEl('line', { x1: padL, x2: W - padR, y1: baseY, y2: baseY, class: 'baseline-line' }));
+  const zt = svgEl('text', { x: padL - 6, y: baseY + 3.5, class: 'tick', 'text-anchor': 'end' });
+  zt.textContent = '0';
+  svg.append(zt);
+
+  const n = data.length;
+  const band = plotW / n;
+  const barW = Math.min(24, Math.max(2, band - 2));
+  const peak = data.reduce((b, d, i) => (d.value > data[b].value ? i : b), 0);
+
+  data.forEach((d, i) => {
+    const h = plotH * (d.value / max);
+    const x = padL + band * i + (band - barW) / 2;
+    const y = baseY - h;
+    const bar = svgEl('path', { d: roundedTopRect(x, y, barW, h, 4), class: 'bar' });
+    svg.append(bar);
+
+    if (opts.showXLabel && opts.showXLabel(d, i)) {
+      const t = svgEl('text', { x: padL + band * i + band / 2, y: H - 8, class: 'xlab', 'text-anchor': 'middle' });
+      t.textContent = d.label;
+      svg.append(t);
+    }
+
+    const hit = svgEl('rect', { x: padL + band * i, y: padT, width: band, height: plotH, class: 'hit', tabindex: 0 });
+    const on = (cx, cy) => { bar.classList.add('hot'); showTip(cx, cy, fmt(d.value) + (opts.unit || ''), d.tipLabel || d.label); };
+    const off = () => { bar.classList.remove('hot'); hideTip(); };
+    hit.addEventListener('pointermove', e => on(e.clientX, e.clientY));
+    hit.addEventListener('pointerleave', off);
+    hit.addEventListener('focus', () => { const r = hit.getBoundingClientRect(); on(r.left + r.width / 2, r.top); });
+    hit.addEventListener('blur', off);
+    svg.append(hit);
+  });
+
+  // Selective direct label: the peak only.
+  if (data[peak] && data[peak].value > 0) {
+    const h = plotH * (data[peak].value / max);
+    const t = svgEl('text', {
+      x: padL + band * peak + band / 2,
+      y: baseY - h - 5,
+      class: 'dlabel', 'text-anchor': 'middle',
+    });
+    t.textContent = fmt(data[peak].value);
+    svg.append(t);
+  }
+
+  container.append(svg);
+}
+
+/* ---- Line + area chart with crosshair tooltip ---- */
+function lineChart(container, data, opts = {}) {
+  container.textContent = '';
+  const W = Math.max(container.clientWidth, 220);
+  const H = opts.height || 230;
+  const padL = 38, padR = 16, padT = 18, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const max = niceCeil(Math.max(1, ...data.map(d => d.value)));
+  const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img' });
+  const baseY = padT + plotH;
+
+  for (const v of [max / 2, max]) {
+    const y = padT + plotH * (1 - v / max);
+    svg.append(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'grid-line' }));
+    const t = svgEl('text', { x: padL - 6, y: y + 3.5, class: 'tick', 'text-anchor': 'end' });
+    t.textContent = fmt(v);
+    svg.append(t);
+  }
+  svg.append(svgEl('line', { x1: padL, x2: W - padR, y1: baseY, y2: baseY, class: 'baseline-line' }));
+  const zt = svgEl('text', { x: padL - 6, y: baseY + 3.5, class: 'tick', 'text-anchor': 'end' });
+  zt.textContent = '0';
+  svg.append(zt);
+
+  const n = data.length;
+  const pts = data.map((d, i) => ({
+    x: padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1)),
+    y: padT + plotH * (1 - d.value / max),
+  }));
+
+  if (n > 1) {
+    const lineD = pts.map((p, i) => (i ? 'L' : 'M') + p.x + ',' + p.y).join(' ');
+    svg.append(svgEl('path', { d: `${lineD} L${pts[n - 1].x},${baseY} L${pts[0].x},${baseY} Z`, class: 'area-mark' }));
+    svg.append(svgEl('path', { d: lineD, class: 'line-mark' }));
+  }
+  if (n <= 36) {
+    for (const p of pts) svg.append(svgEl('circle', { cx: p.x, cy: p.y, r: 4, class: 'dot' }));
+  }
+
+  // X labels: about six, evenly spaced; skip the one before the endpoint so the
+  // end-anchored final label never collides or clips at the right edge.
+  const step = Math.max(1, Math.ceil(n / 6));
+  data.forEach((d, i) => {
+    const isLast = i === n - 1;
+    if (!isLast && (i % step !== 0 || n - 1 - i < step / 2)) return;
+    const t = svgEl('text', {
+      x: pts[i].x, y: H - 8, class: 'xlab',
+      'text-anchor': isLast ? 'end' : (i === 0 ? 'start' : 'middle'),
+    });
+    t.textContent = d.label;
+    svg.append(t);
+  });
+
+  // Direct label on the endpoint.
+  if (n > 0) {
+    const lastPt = pts[n - 1];
+    const t = svgEl('text', { x: lastPt.x, y: Math.max(padT + 4, lastPt.y - 8), class: 'dlabel', 'text-anchor': 'end' });
+    t.textContent = fmt(data[n - 1].value);
+    svg.append(t);
+  }
+
+  // Crosshair finds the X.
+  const cross = svgEl('line', { x1: 0, x2: 0, y1: padT, y2: baseY, class: 'cross', visibility: 'hidden' });
+  const hoverDot = svgEl('circle', { r: 5, class: 'dot', visibility: 'hidden' });
+  svg.append(cross, hoverDot);
+  const overlay = svgEl('rect', { x: padL, y: padT, width: plotW, height: plotH, class: 'hit' });
+  overlay.addEventListener('pointermove', e => {
+    const rect = svg.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    let best = 0;
+    for (let i = 1; i < n; i++) if (Math.abs(pts[i].x - mx) < Math.abs(pts[best].x - mx)) best = i;
+    cross.setAttribute('x1', pts[best].x);
+    cross.setAttribute('x2', pts[best].x);
+    cross.setAttribute('visibility', 'visible');
+    hoverDot.setAttribute('cx', pts[best].x);
+    hoverDot.setAttribute('cy', pts[best].y);
+    hoverDot.setAttribute('visibility', 'visible');
+    showTip(e.clientX, e.clientY, fmt(data[best].value) + ' bookmarks', data[best].tipLabel || data[best].label);
+  });
+  overlay.addEventListener('pointerleave', () => {
+    cross.setAttribute('visibility', 'hidden');
+    hoverDot.setAttribute('visibility', 'hidden');
+    hideTip();
+  });
+  svg.append(overlay);
+
+  container.append(svg);
+}
+
+/* ---- Horizontal bars (HTML rows) ---- */
+function hBarChart(container, data, opts = {}) {
+  container.textContent = '';
+  const max = Math.max(1, ...data.map(d => d.value));
+  for (const d of data) {
+    const row = el('div', 'hrow' + (opts.onClick ? ' clickable' : ''));
+    row.append(el('span', 'hlabel', d.label));
+    const track = el('div', 'htrack');
+    const bar = el('div', 'hbar');
+    bar.style.width = (100 * d.value / max) + '%';
+    track.append(bar);
+    row.append(track);
+    row.append(el('span', 'hval', fmt(d.value)));
+    row.addEventListener('pointermove', e => { row.classList.add('hot'); showTip(e.clientX, e.clientY, fmt(d.value) + (opts.unit || ''), d.tipLabel || d.label); });
+    row.addEventListener('pointerleave', () => { row.classList.remove('hot'); hideTip(); });
+    if (opts.onClick) {
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.addEventListener('click', () => opts.onClick(d));
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opts.onClick(d); } });
+    }
+    container.append(row);
+  }
+}
+
+/* ---- Table twin for every chart ---- */
+function renderTable(container, headers, rows) {
+  container.textContent = '';
+  const table = el('table');
+  const trh = el('tr');
+  headers.forEach((h, i) => trh.append(el('th', i > 0 ? 'num' : '', h)));
+  table.append(trh);
+  for (const r of rows) {
+    const tr = el('tr');
+    r.forEach((c, i) => tr.append(el('td', i > 0 ? 'num' : '', typeof c === 'number' ? fmt(c) : c)));
+    table.append(tr);
+  }
+  container.append(table);
+}
+
+/* ---- Chart card wiring (chart/table toggle + resize re-render) ---- */
+const cards = [];
+function mountCard(id, render, tableHeaders, tableRows) {
+  const card = $('#' + id);
+  const body = $('.cbody', card);
+  const tableEl = $('.ctable', card);
+  const btn = $('.tbtn', card);
+  btn.addEventListener('click', () => {
+    const showTable = btn.getAttribute('aria-pressed') !== 'true';
+    btn.setAttribute('aria-pressed', String(showTable));
+    btn.textContent = showTable ? 'Chart' : 'Table';
+    body.hidden = showTable;
+    tableEl.hidden = !showTable;
+  });
+  renderTable(tableEl, tableHeaders, tableRows);
+  const doRender = () => { if (!body.hidden) render(body); };
+  doRender();
+  cards.push(doRender);
+}
+let resizeTimer = null;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => cards.forEach(fn => fn()), 150);
+});
+
+/* ---- Formatting helpers ---- */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function monthLabel(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return MONTHS[m - 1] + ' ’' + String(y).slice(2);
+}
+function monthFull(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return MONTHS[m - 1] + ' ' + y;
+}
+const TYPE_LABELS = { photo: 'Photos', video: 'Videos', animated_gif: 'GIFs' };
+
+/* ---- Stats section ---- */
+function tile(label, value, sub) {
+  const t = el('div', 'card tile');
+  t.append(el('div', 'tlabel', label));
+  t.append(el('div', 'tvalue', value));
+  if (sub) t.append(el('div', 'tsub', sub));
+  return t;
+}
+
+async function loadStats() {
+  const res = await fetch('/api/explore/stats');
+  if (!res.ok) throw new Error('stats request failed');
+  const stats = await res.json();
+
+  if (stats.first_bookmark) {
+    const first = new Date(stats.first_bookmark);
+    const last = new Date(stats.last_bookmark);
+    const opt = { year: 'numeric', month: 'short' };
+    $('#subtitle').textContent =
+      'Your X bookmarks archive · ' + first.toLocaleDateString(undefined, opt) + ' – ' + last.toLocaleDateString(undefined, opt);
+  }
+
+  const kpis = $('#kpis');
+  kpis.textContent = '';
+  const monthly = stats.monthly || [];
+  const thisMonth = monthly.length ? monthly[monthly.length - 1].count : 0;
+  kpis.append(tile('Bookmarks', fmt(stats.totals.bookmarks), '+' + fmt(thisMonth) + ' this month'));
+  kpis.append(tile('Authors', fmt(stats.totals.authors)));
+  const withMediaPct = stats.totals.bookmarks ? Math.round(100 * stats.totals.tweets_with_media / stats.totals.bookmarks) : 0;
+  kpis.append(tile('With media', fmt(stats.totals.tweets_with_media), withMediaPct + '% of bookmarks'));
+  kpis.append(tile(
+    'Media files',
+    fmt(stats.totals.media_downloaded) + ' / ' + fmt(stats.totals.media_total),
+    stats.totals.media_failed > 0 ? fmt(stats.totals.media_failed) + ' failed' : 'downloaded'
+  ));
+
+  const monthData = monthly.map(m => ({ label: monthLabel(m.month), tipLabel: monthFull(m.month), value: m.count }));
+  mountCard('c-monthly',
+    body => lineChart(body, monthData, { height: 230 }),
+    ['Month', 'Bookmarks'], monthly.map(m => [monthFull(m.month), m.count]));
+
+  const hourData = (stats.hours || []).map((v, h) => ({
+    label: String(h), tipLabel: String(h).padStart(2, '0') + ':00 – ' + String(h).padStart(2, '0') + ':59', value: v,
+  }));
+  mountCard('c-hours',
+    body => columnChart(body, hourData, { showXLabel: (d, i) => i % 6 === 0 || i === 23 }),
+    ['Hour', 'Bookmarks'], hourData.map(d => [d.tipLabel, d.value]));
+
+  const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const wdData = (stats.weekdays || []).map((v, i) => ({ label: WEEKDAYS[i], value: v }));
+  mountCard('c-weekdays',
+    body => columnChart(body, wdData, { showXLabel: () => true }),
+    ['Day', 'Bookmarks'], wdData.map(d => [d.label, d.value]));
+
+  const authorData = (stats.top_authors || []).map(a => ({
+    label: '@' + a.screen_name, tipLabel: (a.name || a.screen_name) + ' · @' + a.screen_name,
+    value: a.count, screenName: a.screen_name,
+  }));
+  mountCard('c-authors',
+    body => hBarChart(body, authorData, {
+      unit: ' bookmarks',
+      onClick: d => setAuthorFilter(d.screenName),
+    }),
+    ['Author', 'Bookmarks'], authorData.map(d => [d.label, d.value]));
+
+  const mediaData = (stats.media_types || []).map(mt => ({ label: TYPE_LABELS[mt.type] || mt.type, value: mt.count }));
+  mountCard('c-media',
+    body => { if (mediaData.length) hBarChart(body, mediaData); else body.append(el('div', 'empty', 'No media yet')); },
+    ['Type', 'Files'], mediaData.map(d => [d.label, d.value]));
+}
+
+/* ---- Browse ---- */
+const state = { q: '', author: '', sort: 'newest', page: 1, totalPages: 1 };
+let fetchController = null;
+
+function setAuthorFilter(screenName) {
+  state.author = screenName;
+  state.page = 1;
+  updateChip();
+  loadTweets();
+  $('.browse').scrollIntoView({ behavior: 'smooth' });
+}
+function updateChip() {
+  const chip = $('#chip');
+  chip.hidden = !state.author;
+  if (state.author) $('span', chip).textContent = '@' + state.author;
+}
+$('#chip button').addEventListener('click', () => { state.author = ''; state.page = 1; updateChip(); loadTweets(); });
+
+let debounceTimer = null;
+$('#q').addEventListener('input', e => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => { state.q = e.target.value.trim(); state.page = 1; loadTweets(); }, 300);
+});
+$('#sort').addEventListener('change', e => { state.sort = e.target.value; state.page = 1; loadTweets(); });
+$('#prev').addEventListener('click', () => { if (state.page > 1) { state.page--; loadTweets(); } });
+$('#next').addEventListener('click', () => { if (state.page < state.totalPages) { state.page++; loadTweets(); } });
+
+function mediaNode(m) {
+  if (m.file) {
+    const src = '/media/' + encodeURIComponent(m.file);
+    if (m.type === 'video' || m.type === 'animated_gif') {
+      const v = document.createElement('video');
+      v.src = src;
+      v.controls = true;
+      v.preload = 'metadata';
+      if (m.type === 'animated_gif') { v.loop = true; v.muted = true; }
+      return v;
+    }
+    const a = document.createElement('a');
+    a.href = src;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    const img = document.createElement('img');
+    img.src = src;
+    img.loading = 'lazy';
+    img.alt = '';
+    a.append(img);
+    return a;
+  }
+  const label = TYPE_LABELS[m.type] || m.type;
+  return el('span', 'mchip', label.replace(/s$/, '').toLowerCase() + ' · not downloaded');
+}
+
+function tweetNode(t) {
+  const art = el('article', 'tweet');
+  const head = el('div', 'thead');
+  head.append(el('span', 'tname', t.name || t.screen_name || 'unknown'));
+  if (t.screen_name) {
+    const handle = el('span', 'thandle', '@' + t.screen_name);
+    handle.title = 'Filter by this author';
+    handle.addEventListener('click', () => setAuthorFilter(t.screen_name));
+    head.append(handle);
+  }
+  const date = new Date(t.created_at);
+  head.append(el('span', 'tdate', date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })));
+  const open = el('a', 'topen', 'Open on X ↗');
+  open.href = t.permanent_url;
+  open.target = '_blank';
+  open.rel = 'noopener';
+  head.append(open);
+  art.append(head);
+
+  if (t.full_text) art.append(el('p', 'ttext', t.full_text));
+
+  if (t.media && t.media.length) {
+    const wrap = el('div', 'mediae');
+    for (const m of t.media) wrap.append(mediaNode(m));
+    art.append(wrap);
+  }
+  return art;
+}
+
+async function loadTweets() {
+  const list = $('#list');
+  list.classList.add('loading'); // keep the previous render at reduced opacity
+  if (fetchController) fetchController.abort();
+  fetchController = new AbortController();
+
+  const params = new URLSearchParams();
+  if (state.q) params.set('q', state.q);
+  if (state.author) params.set('author', state.author);
+  if (state.sort !== 'newest') params.set('sort', state.sort);
+  params.set('page', String(state.page));
+
+  let data;
+  try {
+    const res = await fetch('/api/explore/tweets?' + params, { signal: fetchController.signal });
+    if (!res.ok) throw new Error('tweets request failed');
+    data = await res.json();
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    list.classList.remove('loading');
+    list.textContent = '';
+    list.append(el('div', 'empty', 'Could not load bookmarks — is the local app running?'));
+    return;
+  }
+
+  state.totalPages = Math.max(1, Math.ceil(data.total / data.page_size));
+  $('#count').textContent = fmt(data.total) + (data.total === 1 ? ' bookmark' : ' bookmarks');
+  $('#pageinfo').textContent = 'Page ' + data.page + ' of ' + fmt(state.totalPages);
+  $('#prev').disabled = data.page <= 1;
+  $('#next').disabled = data.page >= state.totalPages;
+
+  list.textContent = '';
+  if (!data.items.length) {
+    list.append(el('div', 'empty', 'No bookmarks match.'));
+  } else {
+    for (const t of data.items) list.append(tweetNode(t));
+  }
+  list.classList.remove('loading');
+}
+
+/* ---- Boot ---- */
+loadStats().catch(() => {
+  $('#kpis').append(el('div', 'card empty', 'Could not load stats — is the local app running?'));
+});
+loadTweets();
+</script>
+</body>
+</html>

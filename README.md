@@ -6,7 +6,7 @@ TBD 用来把 X/Twitter 书签同步到本地，并下载书签里的媒体文�
 
 它由两部分组成：
 
-- 本地 Go 服务：保存书签到 `bookmarks.db`，下载媒体到 `media/`
+- 本地 Go 服务：保存书签到 `bookmarks.db`，下载媒体到 `media/`，并在 `http://localhost:41008` 提供一个浏览与统计仪表盘
 - Tampermonkey 用户脚本：在 `x.com/i/history` 页面捕获浏览器收到的书签数据并发送给本地服务
 
 默认下载视频和图片。图片下载可以在页面左下角控制面板里关闭。
@@ -18,7 +18,7 @@ TBD 用来把 X/Twitter 书签同步到本地，并下载书签里的媒体文�
 先安装 [Go](https://go.dev/dl/)，然后在项目目录运行：
 
 ```bash
-go build -o tbd .
+go build -o tbd ./cmd/tbd
 ./tbd
 ```
 
@@ -29,7 +29,7 @@ go build -o tbd .
 1. 安装 Tampermonkey 浏览器扩展。
 2. 打开 Tampermonkey 的设置页，启用 **Allow User Scripts**。这一步必须打开，否则用户脚本不会正常运行。
 3. 在 Tampermonkey 里创建新脚本。
-4. 把 [sync-bookmarks.user.js](./sync-bookmarks.user.js) 的完整内容复制进去并保存。
+4. 把 [web/sync-bookmarks.user.js](./web/sync-bookmarks.user.js) 的完整内容复制进去并保存。
 5. 确认脚本处于启用状态。
 
 ## 使用
@@ -59,7 +59,31 @@ https://x.com/i/history
 
 - 数据库：`bookmarks.db`
 - 媒体文件：`media/`
-- 日志：`logs`
+
+## 浏览仪表盘
+
+服务运行时，打开 <http://localhost:41008> 即可浏览整个书签库：
+
+- 概览：总数、作者数、含媒体比例、媒体下载进度
+- 图表：按月趋势、按小时/星期分布、Top 作者、媒体类型（每个图表都可切换为表格视图）
+- 浏览：全文/作者搜索、按作者筛选（点击 Top 作者条目）、本地媒体预览、跳转原推
+
+仪表盘只监听 `127.0.0.1`，不会暴露给局域网。
+
+## 项目结构
+
+```text
+cmd/tbd/            程序入口
+internal/config/    设置文件读写
+internal/logx/      终端输出
+internal/store/     SQLite 与数据模型
+internal/twitter/   X API 响应解析
+internal/syncer/    书签同步逻辑
+internal/download/  媒体下载 worker
+internal/server/    HTTP API 与仪表盘
+internal/export/    导出 @handles
+web/                Tampermonkey 用户脚本
+```
 
 ## 导出 @handles
 
@@ -74,6 +98,14 @@ https://x.com/i/history
 ```bash
 ./tbd --export-handles --handles-output my-handles.json
 ```
+
+## 重置数据
+
+```bash
+./tbd --reset
+```
+
+确认后会删除 `bookmarks.db`（含 WAL 文件），然后退出。`media/` 里已下载的媒体文件**永远不会被删除**。执行前请先停止正在运行的 `./tbd`。
 
 ## 设置
 
@@ -106,7 +138,7 @@ https://x.com/i/history
 
 ### 更新脚本后没有生效
 
-回到 Tampermonkey，把 [sync-bookmarks.user.js](./sync-bookmarks.user.js) 的最新内容重新复制进去并保存。
+回到 Tampermonkey，把 [web/sync-bookmarks.user.js](./web/sync-bookmarks.user.js) 的最新内容重新复制进去并保存。
 
 ## 许可证
 

@@ -1,4 +1,4 @@
-package main
+package syncer
 
 import (
 	"encoding/json"
@@ -8,15 +8,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"twitter-bookmarks-downloader/internal/config"
+	"twitter-bookmarks-downloader/internal/store"
 )
 
 func TestProcessSyncRawKeepsUnwrappedTweetResult(t *testing.T) {
-	originalDB := DB
+	originalDB := store.DB
 	t.Cleanup(func() {
-		DB = originalDB
+		store.DB = originalDB
 	})
 
-	require.NoError(t, InitDB(":memory:"))
+	require.NoError(t, store.Init(":memory:"))
 
 	raw := json.RawMessage(`{
 		"data": {
@@ -60,23 +63,23 @@ func TestProcessSyncRawKeepsUnwrappedTweetResult(t *testing.T) {
 	require.True(t, response.Success)
 	assert.Equal(t, 1, response.SavedCount)
 
-	var tweet TweetModel
-	require.NoError(t, DB.First(&tweet, "id = ?", "tweet-1").Error)
+	var tweet store.TweetModel
+	require.NoError(t, store.DB.First(&tweet, "id = ?", "tweet-1").Error)
 	assert.Equal(t, "alice", tweet.ScreenName)
 }
 
 func TestProcessSyncRawStoresImageMediaWhenImageDownloadsDisabled(t *testing.T) {
-	originalDB := DB
+	originalDB := store.DB
 	t.Cleanup(func() {
-		DB = originalDB
+		store.DB = originalDB
 	})
 
-	withTestConfig(t, Config{
+	t.Cleanup(config.SwapForTest(config.Config{
 		MediaDir:       "media",
 		DownloadVideos: true,
 		DownloadImages: false,
-	})
-	require.NoError(t, InitDB(":memory:"))
+	}))
+	require.NoError(t, store.Init(":memory:"))
 
 	raw := json.RawMessage(`{
 		"data": {
@@ -126,25 +129,25 @@ func TestProcessSyncRawStoresImageMediaWhenImageDownloadsDisabled(t *testing.T) 
 	require.True(t, response.Success)
 	assert.Equal(t, 1, response.SavedCount)
 
-	var media MediaModel
-	require.NoError(t, DB.First(&media, "id = ?", "media-1").Error)
+	var media store.MediaModel
+	require.NoError(t, store.DB.First(&media, "id = ?", "media-1").Error)
 	assert.Equal(t, "photo", media.Type)
 	assert.False(t, media.Downloaded)
 }
 
 func TestProcessSyncRawBackfillsMediaForExistingTweet(t *testing.T) {
-	originalDB := DB
+	originalDB := store.DB
 	t.Cleanup(func() {
-		DB = originalDB
+		store.DB = originalDB
 	})
 
-	withTestConfig(t, Config{
+	t.Cleanup(config.SwapForTest(config.Config{
 		MediaDir:       "media",
 		DownloadVideos: true,
 		DownloadImages: false,
-	})
-	require.NoError(t, InitDB(":memory:"))
-	require.NoError(t, DB.Create(&TweetModel{
+	}))
+	require.NoError(t, store.Init(":memory:"))
+	require.NoError(t, store.DB.Create(&store.TweetModel{
 		ID:         "tweet-with-missing-media",
 		ScreenName: "alice",
 	}).Error)
@@ -197,28 +200,28 @@ func TestProcessSyncRawBackfillsMediaForExistingTweet(t *testing.T) {
 	require.True(t, response.Success)
 	assert.Equal(t, 0, response.SavedCount)
 
-	var media MediaModel
-	require.NoError(t, DB.First(&media, "id = ?", "media-1").Error)
+	var media store.MediaModel
+	require.NoError(t, store.DB.First(&media, "id = ?", "media-1").Error)
 	assert.Equal(t, "tweet-with-missing-media", media.TweetID)
 	assert.False(t, media.Downloaded)
 }
 
 func TestProcessSyncRawKeepsSavingAfterDuplicateLimitWithinBatch(t *testing.T) {
-	originalDB := DB
+	originalDB := store.DB
 	t.Cleanup(func() {
-		DB = originalDB
+		store.DB = originalDB
 	})
 
-	require.NoError(t, InitDB(":memory:"))
-	for i := 0; i < DUPLICATE_THRESHOLD; i++ {
-		require.NoError(t, DB.Create(&TweetModel{
+	require.NoError(t, store.Init(":memory:"))
+	for i := 0; i < DuplicateThreshold; i++ {
+		require.NoError(t, store.DB.Create(&store.TweetModel{
 			ID:         fmt.Sprintf("duplicate-%d", i),
 			ScreenName: "alice",
 		}).Error)
 	}
 
-	entries := make([]string, 0, DUPLICATE_THRESHOLD+1)
-	for i := 0; i < DUPLICATE_THRESHOLD; i++ {
+	entries := make([]string, 0, DuplicateThreshold+1)
+	for i := 0; i < DuplicateThreshold; i++ {
 		entries = append(entries, bookmarkEntryJSON(fmt.Sprintf("duplicate-%d", i), "alice"))
 	}
 	entries = append(entries, bookmarkEntryJSON("new-after-duplicates", "bob"))
@@ -229,8 +232,8 @@ func TestProcessSyncRawKeepsSavingAfterDuplicateLimitWithinBatch(t *testing.T) {
 	assert.True(t, response.DuplicateLimitReached)
 	assert.Equal(t, 1, response.SavedCount)
 
-	var tweet TweetModel
-	require.NoError(t, DB.First(&tweet, "id = ?", "new-after-duplicates").Error)
+	var tweet store.TweetModel
+	require.NoError(t, store.DB.First(&tweet, "id = ?", "new-after-duplicates").Error)
 	assert.Equal(t, "bob", tweet.ScreenName)
 }
 

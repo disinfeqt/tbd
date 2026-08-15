@@ -1,4 +1,5 @@
-package main
+// Package download runs the background media download worker.
+package download
 
 import (
 	"context"
@@ -15,24 +16,29 @@ import (
 
 	"github.com/rotisserie/eris"
 	"gorm.io/gorm"
+
+	"twitter-bookmarks-downloader/internal/config"
+	"twitter-bookmarks-downloader/internal/logx"
+	"twitter-bookmarks-downloader/internal/store"
+	"twitter-bookmarks-downloader/internal/twitter"
 )
 
-// downloadNudge lets the sync handler wake the worker as soon as new media
-// arrives instead of waiting for the next poll tick.
-var downloadNudge = make(chan struct{}, 1)
+// nudge lets the sync handler wake the worker as soon as new media arrives
+// instead of waiting for the next poll tick.
+var nudge = make(chan struct{}, 1)
 
-func NudgeDownloadWorker() {
+func Nudge() {
 	select {
-	case downloadNudge <- struct{}{}:
+	case nudge <- struct{}{}:
 	default: // A wake-up is already queued.
 	}
 }
 
-func StartDownloadWorker() {
-	PrintInfo("Download worker started")
+func StartWorker() {
+	logx.Info("Download worker started")
 
 	// Initial report on startup (force display)
-	ReportWorkerStatus(true)
+	ReportStatus(true)
 
 	ticker := time.NewTicker(5 * time.Second)
 	statusTicker := time.NewTicker(10 * time.Minute)
@@ -40,42 +46,68 @@ func StartDownloadWorker() {
 	for {
 		select {
 		case <-ticker.C:
-			DownloadPendingMedia()
-		case <-downloadNudge:
-			DownloadPendingMedia()
+			ProcessQueue()
+		case <-nudge:
+			ProcessQueue()
 		case <-statusTicker.C:
-			ReportWorkerStatus(false)
+			ReportStatus(false)
 		}
 	}
 }
 
-func ReportWorkerStatus(force bool) {
+func ReportStatus(force bool) {
 	var pending int64
 	var paused int64
 	var failed int64
-	if err := pendingDownloadQuery().Count(&pending).Error; err != nil {
-		PrintError(eris.Wrap(err, "Failed to count pending media"))
+	if err := pendingQuery().Count(&pending).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to count pending media"))
 	}
-	if err := DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&paused).Error; err == nil {
+	if err := store.DB.Model(&store.MediaModel{}).Where("downloaded = ? AND failed = ?", false, false).Count(&paused).Error; err == nil {
 		paused -= pending
 	} else {
-		PrintError(eris.Wrap(err, "Failed to count paused media"))
+		logx.Error(eris.Wrap(err, "Failed to count paused media"))
 	}
-	if err := DB.Model(&MediaModel{}).Where("failed = ?", true).Count(&failed).Error; err != nil {
-		PrintError(eris.Wrap(err, "Failed to count failed media"))
+	if err := store.DB.Model(&store.MediaModel{}).Where("failed = ?", true).Count(&failed).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to count failed media"))
 	}
 
 	if force || pending > 0 || paused > 0 || failed > 0 {
-		PrintInfoF("Downloads — waiting: %d · paused by settings: %d · failed: %d", pending, paused, failed)
+		logx.Infof("Downloads — waiting: %d · paused by settings: %d · failed: %d", pending, paused, failed)
 		if failed > 0 {
-			PrintWarningF("%d media items gave up after multiple retries", failed)
+			logx.Warnf("%d media items gave up after multiple retries", failed)
 		}
 	}
 }
 
-func pendingDownloadQuery() *gorm.DB {
-	query := DB.Model(&MediaModel{}).Where("downloaded = ? AND failed = ?", false, false)
-	current := CurrentConfig()
+func ShouldDownloadURL(rawURL string) bool {
+	if rawURL == "" {
+		return false
+	}
+
+	current := config.Current()
+	if twitter.IsMP4MediaURL(rawURL) {
+		return current.DownloadVideos
+	}
+
+	return current.DownloadImages
+}
+
+func ShouldDownload(media store.MediaModel) bool {
+	current := config.Current()
+
+	switch media.Type {
+	case "photo":
+		return current.DownloadImages
+	case "video", "animated_gif":
+		return current.DownloadVideos
+	default:
+		return ShouldDownloadURL(media.URL)
+	}
+}
+
+func pendingQuery() *gorm.DB {
+	query := store.DB.Model(&store.MediaModel{}).Where("downloaded = ? AND failed = ?", false, false)
+	current := config.Current()
 
 	switch {
 	case current.DownloadImages && current.DownloadVideos:
@@ -93,12 +125,12 @@ func pendingDownloadQuery() *gorm.DB {
 // without saturating the connection.
 const maxConcurrentDownloads = 3
 
-func DownloadPendingMedia() {
+func ProcessQueue() {
 	// Fetch the batch first so the idle path (no pending media) costs one query.
-	var mediaList []MediaModel
+	var mediaList []store.MediaModel
 	// Find up to 5 pending downloads
-	if err := pendingDownloadQuery().Limit(5).Find(&mediaList).Error; err != nil {
-		PrintError(eris.Wrap(err, "Failed to query pending media"))
+	if err := pendingQuery().Limit(5).Find(&mediaList).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to query pending media"))
 		return
 	}
 	if len(mediaList) == 0 {
@@ -107,12 +139,12 @@ func DownloadPendingMedia() {
 
 	var total int64
 	var pending int64
-	if err := DB.Model(&MediaModel{}).Count(&total).Error; err != nil {
-		PrintError(eris.Wrap(err, "Failed to count total media"))
+	if err := store.DB.Model(&store.MediaModel{}).Count(&total).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to count total media"))
 		return
 	}
-	if err := pendingDownloadQuery().Count(&pending).Error; err != nil {
-		PrintError(eris.Wrap(err, "Failed to count pending media"))
+	if err := pendingQuery().Count(&pending).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to count pending media"))
 		return
 	}
 
@@ -123,8 +155,8 @@ func DownloadPendingMedia() {
 			continue
 		}
 		var count int64
-		if err := DB.Model(&MediaModel{}).Where("tweet_id = ?", media.TweetID).Count(&count).Error; err != nil {
-			PrintError(eris.Wrap(err, "Failed to count tweet media"))
+		if err := store.DB.Model(&store.MediaModel{}).Where("tweet_id = ?", media.TweetID).Count(&count).Error; err != nil {
+			logx.Error(eris.Wrap(err, "Failed to count tweet media"))
 			continue
 		}
 		mediaCounts[media.TweetID] = count
@@ -137,7 +169,7 @@ func DownloadPendingMedia() {
 	for i := range mediaList {
 		media := &mediaList[i]
 		progressLabel := fmt.Sprintf("%d/%d", completed+int64(i)+1, total)
-		if !shouldDownloadMedia(*media) {
+		if !ShouldDownload(*media) {
 			continue
 		}
 		mediaCount, ok := mediaCounts[media.TweetID]
@@ -147,13 +179,13 @@ func DownloadPendingMedia() {
 
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(media *MediaModel, progressLabel string, mediaCount int) {
+		go func(media *store.MediaModel, progressLabel string, mediaCount int) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
 			err := processMediaDownload(media, progressLabel, mediaCount)
 			if err != nil {
-				PrintError(eris.Wrapf(err, "Media ID: %s", media.ID))
+				logx.Error(eris.Wrapf(err, "Media ID: %s", media.ID))
 				media.RetryCount++
 				if media.RetryCount >= 3 {
 					media.Failed = true
@@ -161,19 +193,19 @@ func DownloadPendingMedia() {
 			} else {
 				media.Downloaded = true
 			}
-			if err := DB.Save(media).Error; err != nil {
-				PrintError(eris.Wrapf(err, "Failed to update media status for %s", media.ID))
+			if err := store.DB.Save(media).Error; err != nil {
+				logx.Error(eris.Wrapf(err, "Failed to update media status for %s", media.ID))
 			}
 		}(media, progressLabel, int(mediaCount))
 	}
 	wg.Wait()
 }
 
-func processMediaDownload(media *MediaModel, progressLabel string, mediaCount int) error {
-	// Select only the columns buildFilename and logging need; RawJSON holds the
+func processMediaDownload(media *store.MediaModel, progressLabel string, mediaCount int) error {
+	// Select only the columns BuildFilename and logging need; RawJSON holds the
 	// full GraphQL payload and would dominate the read otherwise.
-	var tweet TweetModel
-	if err := DB.Select("id", "screen_name", "created_at", "permanent_url").
+	var tweet store.TweetModel
+	if err := store.DB.Select("id", "screen_name", "created_at", "permanent_url").
 		First(&tweet, "id = ?", media.TweetID).Error; err != nil {
 		return eris.Wrap(err, "Tweet not found for media")
 	}
@@ -190,8 +222,8 @@ func processMediaDownload(media *MediaModel, progressLabel string, mediaCount in
 		parsedURL.RawQuery = params.Encode()
 	}
 
-	filename := buildFilename(&tweet, media.Index, mediaCount, parsedURL)
-	outputPath := filepath.Join(CurrentConfig().MediaDir, filename)
+	filename := BuildFilename(&tweet, media.Index, mediaCount, parsedURL)
+	outputPath := filepath.Join(config.Current().MediaDir, filename)
 
 	if err := downloadFile(parsedURL.String(), outputPath, tweet.CreatedAt, progressLabel); err != nil {
 		return eris.Wrapf(err, "URL: %s (from Tweet: %s)", media.URL, tweet.PermanentURL)
@@ -207,7 +239,7 @@ const (
 )
 
 // 规则 1, 2, 3, 4: 严格遵循原版文件名规则
-func buildFilename(tweet *TweetModel, index int, total int, url *url.URL) string {
+func BuildFilename(tweet *store.TweetModel, index int, total int, url *url.URL) string {
 	fileExt := strings.ToLower(path.Ext(url.Path))
 	filenameBase := fmt.Sprintf("twitter-@%s-%s-%s",
 		tweet.ScreenName,
@@ -237,9 +269,9 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 	if now.Sub(pw.lastLog) >= downloadProgressInterval {
 		pw.lastLog = now
 		if pw.total > 0 {
-			PrintInfoF("  [Download %s] Downloading: %s (%s/%s)", pw.label, pw.outputPath, formatByteSize(pw.written), formatByteSize(pw.total))
+			logx.Infof("  [Download %s] Downloading: %s (%s/%s)", pw.label, pw.outputPath, formatByteSize(pw.written), formatByteSize(pw.total))
 		} else {
-			PrintInfoF("  [Download %s] Downloading: %s (%s)", pw.label, pw.outputPath, formatByteSize(pw.written))
+			logx.Infof("  [Download %s] Downloading: %s (%s)", pw.label, pw.outputPath, formatByteSize(pw.written))
 		}
 	}
 
@@ -288,19 +320,19 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time, progressL
 		resp, err := http.DefaultClient.Do(req)
 		cancel()
 		if err != nil {
-			PrintWarning("Failed to check remote file size, force downloading")
+			logx.Warn("Failed to check remote file size, force downloading")
 		} else {
 			if resp.ContentLength > 0 {
 				if fileInfo.Size() == resp.ContentLength {
 					if err := resp.Body.Close(); err != nil {
-						PrintWarningF("Failed to close HEAD response body: %v", err)
+						logx.Warnf("Failed to close HEAD response body: %v", err)
 					}
-					PrintInfoF("  [Download %s] Skipped: %s", progressLabel, outputPath)
+					logx.Infof("  [Download %s] Skipped: %s", progressLabel, outputPath)
 					return nil
 				}
 			}
 			if err := resp.Body.Close(); err != nil {
-				PrintWarningF("Failed to close HEAD response body: %v", err)
+				logx.Warnf("Failed to close HEAD response body: %v", err)
 			}
 		}
 	}
@@ -317,7 +349,7 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time, progressL
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			PrintWarningF("Failed to close response body: %v", err)
+			logx.Warnf("Failed to close response body: %v", err)
 		}
 	}()
 
@@ -326,9 +358,9 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time, progressL
 	}
 
 	if resp.ContentLength > 0 {
-		PrintInfoF("  [Download %s] Starting: %s (%s)", progressLabel, outputPath, formatByteSize(resp.ContentLength))
+		logx.Infof("  [Download %s] Starting: %s (%s)", progressLabel, outputPath, formatByteSize(resp.ContentLength))
 	} else {
-		PrintInfoF("  [Download %s] Starting: %s (unknown size)", progressLabel, outputPath)
+		logx.Infof("  [Download %s] Starting: %s (unknown size)", progressLabel, outputPath)
 	}
 
 	tmpPath := outputPath + ".part"
@@ -365,7 +397,7 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time, progressL
 			return eris.Errorf("download incomplete, expected %d bytes, got %d bytes", resp.ContentLength, written)
 		}
 	} else {
-		PrintWarning("Content-Length header not provided by the server.")
+		logx.Warn("Content-Length header not provided by the server.")
 	}
 
 	if err := os.Remove(outputPath); err != nil && !os.IsNotExist(err) {
@@ -380,6 +412,6 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time, progressL
 		return eris.Wrap(err, "failed to set modified time")
 	}
 
-	PrintInfoF("  [Download %s] Downloaded: %s", progressLabel, outputPath)
+	logx.Infof("  [Download %s] Downloaded: %s", progressLabel, outputPath)
 	return nil
 }
