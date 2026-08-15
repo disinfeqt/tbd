@@ -30,7 +30,7 @@ go build -o tbd ./cmd/tbd
 
 1. 安装 [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) 浏览器扩展
 2. 在 Tampermonkey 设置页启用 **Allow User Scripts**（必须打开，否则脚本不会运行）
-3. 新建脚本，把 [web/sync-bookmarks.user.js](https://raw.githubusercontent.com/disinfeqt/tbd/main/web/sync-bookmarks.user.js) 的完整内容复制进去并保存
+3. 新建脚本，把 [web/sync-bookmarks.user.js](./web/sync-bookmarks.user.js) 的完整内容复制进去并保存
 4. 确认脚本处于启用状态
 
 ### 3. 开始同步
@@ -102,7 +102,7 @@ https://x.com/i/history
 
 **更新脚本后没有生效？**
 
-回到 Tampermonkey，把 [web/sync-bookmarks.user.js](https://raw.githubusercontent.com/disinfeqt/tbd/main/web/sync-bookmarks.user.js) 的最新内容重新复制进去并保存。
+回到 Tampermonkey，把 [web/sync-bookmarks.user.js](./web/sync-bookmarks.user.js) 的最新内容重新复制进去并保存。
 
 ## 许可证
 
