@@ -228,6 +228,7 @@ type exploreMediaItem struct {
 	Missing    bool   `json:"missing,omitempty"` // downloaded, but the file is gone from disk
 	Width      int    `json:"width,omitempty"`
 	Height     int    `json:"height,omitempty"`
+	DurationMs int    `json:"duration_ms,omitempty"`
 }
 
 type exploreTweetItem struct {
@@ -270,6 +271,13 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 		sortOrder = "created_at DESC"
 	case "tweet-oldest":
 		sortOrder = "created_at ASC"
+	// Length sorts use the tweet's longest video; tweets with no known
+	// duration go last either way.
+	case "longest":
+		sortOrder = "(SELECT COALESCE(MAX(duration_ms), 0) FROM media WHERE media.tweet_id = tweets.id) DESC, created_at DESC"
+	case "shortest":
+		sortOrder = `CASE WHEN (SELECT COALESCE(MAX(duration_ms), 0) FROM media WHERE media.tweet_id = tweets.id) > 0 THEN 0 ELSE 1 END,
+			(SELECT COALESCE(MAX(duration_ms), 0) FROM media WHERE media.tweet_id = tweets.id) ASC, created_at DESC`
 	}
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
@@ -401,11 +409,17 @@ func exploreItemFromTweet(tweet *store.TweetModel) exploreTweetItem {
 				mi.File = download.BuildFilename(tweet, media.Index, len(tweet.Media), parsedURL)
 			}
 		}
+		entity, hasEntity := download.MatchingMediaEntity(media, entities)
 		if media.Width > 0 && media.Height > 0 {
 			mi.Width, mi.Height = media.Width, media.Height
-		} else if entity, ok := download.MatchingMediaEntity(media, entities); ok {
+		} else if hasEntity {
 			mi.Width = entity.OriginalInfo.Width
 			mi.Height = entity.OriginalInfo.Height
+		}
+		if media.DurationMs > 0 {
+			mi.DurationMs = media.DurationMs
+		} else if hasEntity {
+			mi.DurationMs = entity.VideoInfo.DurationMillis
 		}
 		item.Media = append(item.Media, mi)
 	}

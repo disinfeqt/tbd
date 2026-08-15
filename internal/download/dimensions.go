@@ -20,18 +20,20 @@ import (
 	"twitter-bookmarks-downloader/internal/twitter"
 )
 
-// BackfillMediaDimensions fills in width/height for media rows that lack them,
-// first from the stored raw tweet JSON (original_info) and otherwise by
-// reading the header of the downloaded file itself. Returns how many rows were
-// filled. Rows whose dimensions cannot be determined are left at 0 and retried
-// on the next run, which is cheap because only headers are read.
-func BackfillMediaDimensions() (int, error) {
+// BackfillMediaMetadata fills in width/height (and, for videos, duration) for
+// media rows that lack them, first from the stored raw tweet JSON and
+// otherwise by reading the header of the downloaded file itself. Returns how
+// many rows were filled. Rows whose metadata cannot be determined are left at
+// 0 and retried on the next run, which is cheap because only headers are read.
+func BackfillMediaMetadata() (int, error) {
 	var tweets []store.TweetModel
 	if err := store.DB.
-		Where("EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id AND (media.width <= 0 OR media.height <= 0))").
+		Where(`EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id
+			AND (media.width <= 0 OR media.height <= 0
+				OR (media.type = 'video' AND media.duration_ms <= 0)))`).
 		Preload("Media").
 		Find(&tweets).Error; err != nil {
-		return 0, eris.Wrap(err, "failed to query media lacking dimensions")
+		return 0, eris.Wrap(err, "failed to query media lacking metadata")
 	}
 
 	mediaDir := config.Current().MediaDir
@@ -45,28 +47,48 @@ func BackfillMediaDimensions() (int, error) {
 		}
 
 		for _, media := range tweet.Media {
-			if media.Width > 0 && media.Height > 0 {
-				continue
-			}
-
-			width, height := 0, 0
-			if entity, ok := MatchingMediaEntity(media, entities); ok {
-				width, height = entity.OriginalInfo.Width, entity.OriginalInfo.Height
-			}
-			if (width <= 0 || height <= 0) && media.Downloaded {
+			filePath := ""
+			if media.Downloaded {
 				if parsedURL, err := url.Parse(media.URL); err == nil {
 					name := BuildFilename(tweet, media.Index, len(tweet.Media), parsedURL)
-					width, height = fileDimensions(filepath.Join(mediaDir, name))
+					filePath = filepath.Join(mediaDir, name)
 				}
 			}
-			if width <= 0 || height <= 0 {
+			entity, hasEntity := MatchingMediaEntity(media, entities)
+
+			updates := map[string]interface{}{}
+			if media.Width <= 0 || media.Height <= 0 {
+				width, height := 0, 0
+				if hasEntity {
+					width, height = entity.OriginalInfo.Width, entity.OriginalInfo.Height
+				}
+				if (width <= 0 || height <= 0) && filePath != "" {
+					width, height = fileDimensions(filePath)
+				}
+				if width > 0 && height > 0 {
+					updates["width"], updates["height"] = width, height
+				}
+			}
+			if media.Type == "video" && media.DurationMs <= 0 {
+				duration := 0
+				if hasEntity {
+					duration = entity.VideoInfo.DurationMillis
+				}
+				if duration <= 0 && filePath != "" {
+					duration = fileDurationMs(filePath)
+				}
+				if duration > 0 {
+					updates["duration_ms"] = duration
+				}
+			}
+			if len(updates) == 0 {
 				continue
 			}
 
 			if err := store.DB.Model(&store.MediaModel{}).
 				Where("id = ?", media.ID).
-				Updates(map[string]interface{}{"width": width, "height": height}).Error; err != nil {
-				return filled, eris.Wrapf(err, "failed to update dimensions for media %s", media.ID)
+				Updates(updates).Error; err != nil {
+				return filled, eris.Wrapf(err, "failed to update metadata for media %s", media.ID)
 			}
 			filled++
 		}
@@ -94,6 +116,64 @@ func fileDimensions(path string) (int, int) {
 		return 0, 0
 	}
 	return cfg.Width, cfg.Height
+}
+
+// fileDurationMs reads the duration of an MP4 file in milliseconds. Returns 0
+// when the file is absent or the header cannot be parsed.
+func fileDurationMs(path string) int {
+	if !strings.EqualFold(filepath.Ext(path), ".mp4") {
+		return 0
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	return mp4DurationMs(f)
+}
+
+// mp4DurationMs walks the MP4 box tree (moov → mvhd) and converts the movie
+// duration from timescale units to milliseconds.
+func mp4DurationMs(r io.ReadSeeker) int {
+	size, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0
+	}
+	moov, moovSize, ok := findBox(r, 0, size, "moov")
+	if !ok {
+		return 0
+	}
+	mvhd, mvhdSize, ok := findBox(r, moov, moov+moovSize, "mvhd")
+	if !ok {
+		return 0
+	}
+	buf := make([]byte, mvhdSize)
+	if _, err := r.Seek(mvhd, io.SeekStart); err != nil {
+		return 0
+	}
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return 0
+	}
+	// Version 0: 32-bit timescale at byte 12, duration at 16.
+	// Version 1: 64-bit times push timescale to byte 20, duration to 24.
+	var timescale, duration uint64
+	if len(buf) > 0 && buf[0] == 1 {
+		if len(buf) < 32 {
+			return 0
+		}
+		timescale = uint64(binary.BigEndian.Uint32(buf[20:]))
+		duration = binary.BigEndian.Uint64(buf[24:])
+	} else {
+		if len(buf) < 20 {
+			return 0
+		}
+		timescale = uint64(binary.BigEndian.Uint32(buf[12:]))
+		duration = uint64(binary.BigEndian.Uint32(buf[16:]))
+	}
+	if timescale == 0 {
+		return 0
+	}
+	return int(duration * 1000 / timescale)
 }
 
 // mp4Dimensions walks the MP4 box tree (moov → trak → tkhd) and returns the

@@ -200,6 +200,40 @@ func TestHandleExploreTweetsTypeFilter(t *testing.T) {
 	assert.EqualValues(t, 1, aliceCounts["text"])
 }
 
+func TestHandleExploreTweetsLengthSort(t *testing.T) {
+	seedExploreDB(t)
+	// Tweet 1 gets a short video, tweet 2 a long one; tweet 3 stays photo-only.
+	require.NoError(t, store.DB.Create(&[]store.MediaModel{
+		{ID: "v1", TweetID: "1", Type: "video", URL: "https://video.twimg.com/a.mp4", DurationMs: 5000},
+		{ID: "v2", TweetID: "2", Type: "video", URL: "https://video.twimg.com/b.mp4", DurationMs: 30000},
+	}).Error)
+
+	get := func(query string) []string {
+		rec := httptest.NewRecorder()
+		handleExploreTweets(rec, httptest.NewRequest(http.MethodGet, "/api/explore/tweets"+query, nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+		ids := []string{}
+		for _, item := range payload["items"].([]any) {
+			ids = append(ids, item.(map[string]any)["id"].(string))
+		}
+		return ids
+	}
+
+	assert.Equal(t, []string{"2", "1", "3"}, get("?sort=longest"))
+	// Tweets with no known duration go last on shortest too.
+	assert.Equal(t, []string{"1", "2", "3"}, get("?sort=shortest"))
+
+	// Duration is exposed on the media payload.
+	rec := httptest.NewRecorder()
+	handleExploreTweets(rec, httptest.NewRequest(http.MethodGet, "/api/explore/tweets?type=video&sort=longest", nil))
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	media := payload["items"].([]any)[0].(map[string]any)["media"].([]any)
+	assert.EqualValues(t, 30000, media[0].(map[string]any)["duration_ms"])
+}
+
 func TestHandleExploreMissingAndDelete(t *testing.T) {
 	seedExploreDB(t)
 	mediaDir := t.TempDir()

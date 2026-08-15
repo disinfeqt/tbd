@@ -584,6 +584,10 @@
         transition:
           transform 0.18s ease,
           box-shadow 0.18s ease;
+        /* Keep the card on its own compositor layer even at rest: fractional
+           masonry tile heights otherwise rasterize the media's bottom edge as
+           a 1px seam that vanishes once hovering promotes the layer. */
+        will-change: transform;
       }
       .mcard:hover,
       .mcard:focus-visible {
@@ -694,12 +698,6 @@
       .mcard:focus-visible .peek {
         opacity: 1;
         translate: 0 0;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .peek {
-          transition: none;
-          translate: 0 0;
-        }
       }
 
       /* caption row below the media */
@@ -1195,6 +1193,8 @@
             <option value="oldest">Oldest added</option>
             <option value="tweet-newest">Newest tweets</option>
             <option value="tweet-oldest">Oldest tweets</option>
+            <option value="longest">Longest video</option>
+            <option value="shortest">Shortest video</option>
           </select>
         </span>
       </div>
@@ -1444,6 +1444,14 @@
       /* ---- Media helpers ---- */
       const mediaSrc = (m) => "/media/" + encodeURIComponent(m.file);
       const isMotion = (m) => m.type === "video" || m.type === "animated_gif";
+      function fmtDuration(ms) {
+        const total = Math.round(ms / 1000);
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+        const pad = (n) => String(n).padStart(2, "0");
+        return h ? h + ":" + pad(m) + ":" + pad(s) : m + ":" + pad(s);
+      }
 
       function badgeEl(t) {
         const wrap = el("div", "badges");
@@ -1451,6 +1459,8 @@
         if (kinds.has("video")) {
           const b = el("span", "badge");
           b.append(icon("play"));
+          const longest = Math.max(...t.media.map((m) => m.duration_ms || 0));
+          if (longest > 0) b.append(" " + fmtDuration(longest));
           wrap.append(b);
         } else if (kinds.has("animated_gif")) {
           wrap.append(el("span", "badge", "GIF"));
@@ -1919,11 +1929,17 @@
         for (const mt of types) {
           const [label, tab] = LABELS[mt.type];
           body.append(
-            statRow("plain", [el("span", "slabel", label)], mt.count, max, () => {
-              clearFilters();
-              state.type = tab;
-              setView("grid");
-            }),
+            statRow(
+              "plain",
+              [el("span", "slabel", label)],
+              mt.count,
+              max,
+              () => {
+                clearFilters();
+                state.type = tab;
+                setView("grid");
+              },
+            ),
           );
         }
       }
@@ -2052,7 +2068,8 @@
           a.textContent = s;
           if (m[1]) a.href = s;
           else if (m[2]) a.href = "https://x.com/" + s.slice(1);
-          else a.href = "https://x.com/hashtag/" + encodeURIComponent(s.slice(1));
+          else
+            a.href = "https://x.com/hashtag/" + encodeURIComponent(s.slice(1));
           frag.append(a);
           last = m.index + s.length;
         }
@@ -2066,6 +2083,7 @@
             "div",
             "pending",
             (TYPE_LABELS[item.type] || item.type) +
+              (item.duration_ms ? " · " + fmtDuration(item.duration_ms) : "") +
               (item.missing ? " · file missing" : " · not downloaded"),
           );
         }
@@ -2145,7 +2163,10 @@
         m.append(stage);
         const strip = el("div", "lb-strip");
         media.forEach((item, i) => {
-          const b = el("button", "lb-thumb" + (i === lbMediaIndex ? " active" : ""));
+          const b = el(
+            "button",
+            "lb-thumb" + (i === lbMediaIndex ? " active" : ""),
+          );
           b.type = "button";
           b.setAttribute("aria-label", "Media " + (i + 1));
           if (item.file && !item.missing) {
@@ -2352,9 +2373,7 @@
         $("#dlstrip").hidden = !busy;
         if (busy) {
           const target = data.downloaded + data.pending;
-          const pct = target
-            ? Math.floor((100 * data.downloaded) / target)
-            : 0;
+          const pct = target ? Math.floor((100 * data.downloaded) / target) : 0;
           $("#dltext").textContent =
             "Downloading media — " +
             fmt(data.downloaded) +
@@ -2370,7 +2389,8 @@
             row.append(el("span", "fname", f.file));
             const track = el("span", "ftrack");
             const bar = el("span", "fbar");
-            const fp = f.total > 0 ? Math.floor((100 * f.written) / f.total) : 0;
+            const fp =
+              f.total > 0 ? Math.floor((100 * f.written) / f.total) : 0;
             bar.style.width = (f.total > 0 ? fp : 100) + "%";
             track.append(bar);
             row.append(track);
@@ -2425,7 +2445,15 @@
         if (/^\d{4}-\d{2}$/.test(p.get("month") || ""))
           state.month = p.get("month");
         const sort = p.get("sort");
-        if (["oldest", "tweet-newest", "tweet-oldest"].includes(sort))
+        if (
+          [
+            "oldest",
+            "tweet-newest",
+            "tweet-oldest",
+            "longest",
+            "shortest",
+          ].includes(sort)
+        )
           state.sort = sort;
         $("#q").value = state.q;
         $("#sort").value = state.sort;

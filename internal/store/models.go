@@ -38,6 +38,10 @@ type MediaModel struct {
 	Width  int `gorm:"default:0" json:"width"`
 	Height int `gorm:"default:0" json:"height"`
 
+	// Video duration in milliseconds, same sources as the dimensions;
+	// 0 for photos and when unknown.
+	DurationMs int `gorm:"default:0" json:"duration_ms"`
+
 	// Download Status
 	Downloaded bool `gorm:"default:false" json:"downloaded"`
 	Failed     bool `gorm:"default:false" json:"failed"`

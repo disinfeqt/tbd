@@ -344,11 +344,14 @@ func mediaModelsForTweet(tweetID string, entities []twitter.MediaEntity) []store
 		}
 
 		mediaModels = append(mediaModels, store.MediaModel{
-			ID:      m.IDStr,
-			TweetID: tweetID,
-			Index:   i,
-			Type:    m.Type,
-			URL:     downloadURL,
+			ID:         m.IDStr,
+			TweetID:    tweetID,
+			Index:      i,
+			Type:       m.Type,
+			URL:        downloadURL,
+			Width:      m.OriginalInfo.Width,
+			Height:     m.OriginalInfo.Height,
+			DurationMs: m.VideoInfo.DurationMillis,
 		})
 	}
 

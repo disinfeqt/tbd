@@ -15,7 +15,8 @@ type VideoVariant struct {
 }
 
 type VideoInfo struct {
-	Variants []VideoVariant `json:"variants"`
+	DurationMillis int            `json:"duration_millis"`
+	Variants       []VideoVariant `json:"variants"`
 }
 
 type OriginalInfo struct {
