@@ -845,6 +845,119 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      /* Multi-media tweets show one item at a time with a thumbnail strip. */
+      .lb-media.carousel {
+        overflow: hidden;
+        gap: 0;
+      }
+      .lb-stage {
+        position: relative;
+        flex: 1;
+        align-self: stretch;
+        min-height: 0;
+        display: flex;
+      }
+      .lb-count {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+      }
+      .lb-mnav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 34px;
+        height: 34px;
+        border: none;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.45);
+        color: #fff;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0;
+        transition:
+          opacity 0.15s,
+          background 0.15s;
+      }
+      .lb-mnav.prev {
+        left: 12px;
+      }
+      .lb-mnav.next {
+        right: 12px;
+      }
+      .lb-stage:hover .lb-mnav:not(:disabled),
+      .lb-mnav:focus-visible {
+        opacity: 1;
+      }
+      .lb-mnav:hover {
+        background: rgba(0, 0, 0, 0.7);
+      }
+      .lb-mnav:disabled {
+        opacity: 0 !important;
+        pointer-events: none;
+      }
+      @media (hover: none) {
+        .lb-mnav:not(:disabled) {
+          opacity: 1;
+        }
+      }
+      .lb-strip {
+        flex: none;
+        align-self: stretch;
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 12px 12px;
+        overflow-x: auto;
+      }
+      .lb-thumb {
+        flex: none;
+        width: 56px;
+        height: 56px;
+        padding: 0;
+        border: 2px solid transparent;
+        border-radius: 10px;
+        overflow: hidden;
+        cursor: pointer;
+        background: var(--surface);
+        opacity: 0.55;
+        transition:
+          opacity 0.15s,
+          border-color 0.15s;
+      }
+      .lb-thumb:hover {
+        opacity: 0.85;
+      }
+      .lb-thumb.active {
+        opacity: 1;
+        border-color: var(--accent);
+      }
+      .lb-thumb img,
+      .lb-thumb video {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        max-height: none;
+        margin: 0;
+        object-fit: cover;
+      }
+      .lb-thumb.pending {
+        display: grid;
+        place-items: center;
+        border-color: var(--border);
+        font-size: 10px;
+        color: var(--muted);
+      }
       .lb-side {
         padding: 20px 20px 16px;
         display: flex;
@@ -1906,8 +2019,10 @@
 
       /* ---- Lightbox ---- */
       let lbIndex = 0;
+      let lbMediaIndex = 0;
       function openLb(i) {
         lbIndex = i;
+        lbMediaIndex = 0;
         fillLb();
         $("#lb").classList.add("open");
         document.body.style.overflow = "hidden";
@@ -1945,60 +2060,128 @@
         return frag;
       }
 
-      function fillLb() {
+      function lbMediaEl(item) {
+        if (!item.file || item.missing) {
+          return el(
+            "div",
+            "pending",
+            (TYPE_LABELS[item.type] || item.type) +
+              (item.missing ? " · file missing" : " · not downloaded"),
+          );
+        }
+        if (isMotion(item)) {
+          const v = document.createElement("video");
+          v.src = mediaSrc(item);
+          v.preload = "metadata";
+          v.playsInline = true;
+          if (item.type === "animated_gif") {
+            v.muted = true;
+            v.loop = true;
+            v.autoplay = true;
+          } else {
+            v.controls = true;
+          }
+          return v;
+        }
+        const img = document.createElement("img");
+        img.src = mediaSrc(item);
+        img.alt = "";
+        return img;
+      }
+      function playLbVideo(container) {
+        // Opening/navigating is a user gesture, so play-with-sound is allowed;
+        // if the browser still blocks it, retry muted.
+        const v = container.querySelector("video[controls]");
+        if (!v) return;
+        v.play().catch(() => {
+          v.muted = true;
+          v.play().catch(() => {});
+        });
+      }
+      function stepLbMedia(delta) {
         const t = state.items[lbIndex];
-        if (!t) return;
+        const media = (t && t.media) || [];
+        const next = lbMediaIndex + delta;
+        if (media.length < 2 || next < 0 || next >= media.length) return false;
+        lbMediaIndex = next;
+        renderLbMedia(t);
+        return true;
+      }
+      function renderLbMedia(t) {
         const m = $("#lbmedia");
         m.textContent = "";
         const media = t.media || [];
-        let firstVideo = null;
+        m.classList.toggle("carousel", media.length > 1);
         if (!media.length) {
           const quote = el("div", "lb-quote");
           quote.append(linkify(t.full_text || "(no text)"));
           m.append(quote);
-        } else {
-          for (const item of media) {
-            if (!item.file || item.missing) {
-              m.append(
-                el(
-                  "div",
-                  "pending",
-                  (TYPE_LABELS[item.type] || item.type) +
-                    (item.missing ? " · file missing" : " · not downloaded"),
-                ),
-              );
-              continue;
-            }
+          return;
+        }
+        if (media.length === 1) {
+          m.append(lbMediaEl(media[0]));
+          playLbVideo(m);
+          return;
+        }
+        lbMediaIndex = Math.min(Math.max(lbMediaIndex, 0), media.length - 1);
+        const stage = el("div", "lb-stage");
+        stage.append(lbMediaEl(media[lbMediaIndex]));
+        stage.append(
+          el("div", "lb-count", lbMediaIndex + 1 + " / " + media.length),
+        );
+        const nav = (cls, label, delta) => {
+          const b = el("button", "lb-mnav " + cls, label);
+          b.type = "button";
+          b.setAttribute(
+            "aria-label",
+            delta < 0 ? "Previous media" : "Next media",
+          );
+          b.disabled =
+            delta < 0 ? lbMediaIndex <= 0 : lbMediaIndex >= media.length - 1;
+          b.addEventListener("click", () => stepLbMedia(delta));
+          return b;
+        };
+        stage.append(nav("prev", "‹", -1), nav("next", "›", 1));
+        m.append(stage);
+        const strip = el("div", "lb-strip");
+        media.forEach((item, i) => {
+          const b = el("button", "lb-thumb" + (i === lbMediaIndex ? " active" : ""));
+          b.type = "button";
+          b.setAttribute("aria-label", "Media " + (i + 1));
+          if (item.file && !item.missing) {
             if (isMotion(item)) {
               const v = document.createElement("video");
               v.src = mediaSrc(item);
-              v.preload = "metadata";
+              v.muted = true;
               v.playsInline = true;
-              if (item.type === "animated_gif") {
-                v.muted = true;
-                v.loop = true;
-                v.autoplay = true;
-              } else {
-                v.controls = true;
-                if (!firstVideo) firstVideo = v;
-              }
-              m.append(v);
+              v.preload = "metadata";
+              b.append(v);
             } else {
               const img = document.createElement("img");
               img.src = mediaSrc(item);
               img.alt = "";
-              m.append(img);
+              b.append(img);
             }
+          } else {
+            b.classList.add("pending");
+            b.append(TYPE_LABELS[item.type] || item.type);
           }
-        }
-        // Opening/navigating is a user gesture, so play-with-sound is allowed;
-        // if the browser still blocks it, retry muted.
-        if (firstVideo) {
-          firstVideo.play().catch(() => {
-            firstVideo.muted = true;
-            firstVideo.play().catch(() => {});
+          b.addEventListener("click", () => {
+            if (i !== lbMediaIndex) {
+              lbMediaIndex = i;
+              renderLbMedia(t);
+            }
           });
-        }
+          strip.append(b);
+        });
+        m.append(strip);
+        playLbVideo(stage);
+      }
+
+      function fillLb() {
+        const t = state.items[lbIndex];
+        if (!t) return;
+        renderLbMedia(t);
         const av = avatarEl(t);
         av.id = "lbavatar";
         $("#lbavatar").replaceWith(av);
@@ -2026,20 +2209,24 @@
       $("#lbprev").addEventListener("click", () => {
         if (lbIndex > 0) {
           lbIndex--;
+          lbMediaIndex = 0;
           fillLb();
         }
       });
       $("#lbnext").addEventListener("click", () => {
         if (lbIndex < state.items.length - 1) {
           lbIndex++;
+          lbMediaIndex = 0;
           fillLb();
         }
       });
       addEventListener("keydown", (e) => {
         if (!$("#lb").classList.contains("open")) return;
         if (e.key === "Escape") closeLb();
-        if (e.key === "ArrowLeft") $("#lbprev").click();
-        if (e.key === "ArrowRight") $("#lbnext").click();
+        // Arrows step through a tweet's own media first, then move on to the
+        // previous/next tweet.
+        if (e.key === "ArrowLeft" && !stepLbMedia(-1)) $("#lbprev").click();
+        if (e.key === "ArrowRight" && !stepLbMedia(1)) $("#lbnext").click();
       });
       function filterAuthor(handle) {
         state.author = handle;
@@ -2068,7 +2255,7 @@
         dec("all");
         const kinds = new Set((t.media || []).map((m) => m.type));
         if (!kinds.size) dec("text");
-        if (kinds.has("photo")) dec("photo");
+        if (kinds.size === 1 && kinds.has("photo")) dec("photo");
         if (kinds.has("video")) dec("video");
         if (kinds.has("animated_gif")) dec("gif");
         if ((t.media || []).some((m) => m.missing)) dec("missing");

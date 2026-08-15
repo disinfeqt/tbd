@@ -152,9 +152,11 @@ func TestHandleExploreTweetsSearchAndFilter(t *testing.T) {
 
 func TestHandleExploreTweetsTypeFilter(t *testing.T) {
 	seedExploreDB(t)
-	// Give one of Alice's tweets a (not yet downloaded) video.
-	require.NoError(t, store.DB.Create(&store.MediaModel{
-		ID: "m2", TweetID: "2", Type: "video", URL: "https://video.twimg.com/v.mp4",
+	// Give one of Alice's tweets a (not yet downloaded) video plus a photo,
+	// making it a mixed-media tweet.
+	require.NoError(t, store.DB.Create(&[]store.MediaModel{
+		{ID: "m2", TweetID: "2", Type: "video", URL: "https://video.twimg.com/v.mp4"},
+		{ID: "m3", TweetID: "2", Index: 1, Type: "photo", URL: "https://pbs.twimg.com/media/b.jpg"},
 	}).Error)
 
 	get := func(query string) map[string]any {
@@ -175,9 +177,14 @@ func TestHandleExploreTweetsTypeFilter(t *testing.T) {
 	assert.EqualValues(t, 0, counts["gif"])
 	assert.EqualValues(t, 1, counts["text"])
 
+	// Photos is photo-only: the mixed photo+video tweet 2 is excluded.
 	photos := get("?type=photo")
 	assert.EqualValues(t, 1, photos["total"])
 	assert.Equal(t, "3", photos["items"].([]any)[0].(map[string]any)["id"])
+
+	videos := get("?type=video")
+	assert.EqualValues(t, 1, videos["total"])
+	assert.Equal(t, "2", videos["items"].([]any)[0].(map[string]any)["id"])
 
 	texts := get("?type=text")
 	assert.EqualValues(t, 1, texts["total"])

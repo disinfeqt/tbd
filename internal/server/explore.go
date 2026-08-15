@@ -310,7 +310,12 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 	}
 	applyTypeFilter := func(query *gorm.DB, mediaType string) *gorm.DB {
 		switch mediaType {
-		case "photo", "video":
+		case "photo":
+			// Photo-only: tweets that mix photos with videos or gifs stay out
+			// of this tab and are reachable via the other media tabs.
+			return query.Where(`EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id AND media.type = 'photo')
+				AND NOT EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id AND media.type <> 'photo')`)
+		case "video":
 			return query.Where("EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id AND media.type = ?)", mediaType)
 		case "gif":
 			return query.Where("EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id AND media.type = ?)", "animated_gif")
