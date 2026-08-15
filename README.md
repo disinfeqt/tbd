@@ -8,12 +8,10 @@
 
 TBD 由两部分组成：
 
-| 组件                    | 作用                                                                                               |
-| ----------------------- | -------------------------------------------------------------------------------------------------- |
-| 本地 Go 服务（`./tbd`） | 保存书签到 `bookmarks.db`，下载媒体到 `media/`，并在 <http://localhost:41008> 提供浏览与统计仪表盘 |
-| Tampermonkey 用户脚本   | 在 `x.com/i/history` 页面捕获浏览器收到的书签数据并发送给本地服务                                  |
-
-默认下载视频和图片，均可在页面控制面板里开关。仪表盘只监听 `127.0.0.1`，不会暴露给局域网。
+| 组件                    | 作用                                                                   |
+| ----------------------- | ---------------------------------------------------------------------- |
+| 本地 Go 服务（`./tbd`） | 保存书签到 `bookmarks.db`，下载媒体到 `media/`，并提供浏览与统计仪表盘 |
+| Tampermonkey 用户脚本   | 在 `x.com/i/history` 页面捕获浏览器收到的书签数据并发送给本地服务      |
 
 ## 快速开始
 
@@ -30,9 +28,9 @@ go build -o tbd ./cmd/tbd
 
 ### 2. 安装 Tampermonkey 脚本
 
-1. 安装 Tampermonkey 浏览器扩展
+1. 安装 [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) 浏览器扩展
 2. 在 Tampermonkey 设置页启用 **Allow User Scripts**（必须打开，否则脚本不会运行）
-3. 新建脚本，把 [web/sync-bookmarks.user.js](./web/sync-bookmarks.user.js) 的完整内容复制进去并保存
+3. 新建脚本，把 [web/sync-bookmarks.user.js](https://raw.githubusercontent.com/disinfeqt/tbd/main/web/sync-bookmarks.user.js) 的完整内容复制进去并保存
 4. 确认脚本处于启用状态
 
 ### 3. 开始同步
@@ -52,7 +50,7 @@ https://x.com/i/history
 | `Download videos` 开关     | 是否下载视频                                                                                 |
 | `Download images` 开关     | 是否下载图片                                                                                 |
 
-面板会自动跟随 X 的浅色/深色主题。同步结果保存在：
+同步结果保存在：
 
 - 数据库：`bookmarks.db`
 - 媒体文件：`media/`
@@ -61,9 +59,11 @@ https://x.com/i/history
 
 服务运行时，打开 <http://localhost:41008> 即可浏览整个书签库：
 
-- **概览**：总数、作者数、含媒体比例、媒体下载进度
-- **图表**：按月趋势、按小时/星期分布、Top 作者、媒体类型（每个图表都可切换为表格视图）
-- **浏览**：全文/作者搜索、按作者筛选（点击 Top 作者条目）、本地媒体预览、跳转原推
+- **统计**：顶部一行显示书签总数、媒体下载进度、作者数和收藏时间跨度，点击进入对应子页（媒体类型、Top 作者、按月时间线、实时活动日志）
+- **筛选与排序**：全文/作者搜索；类型标签——全部 / 图片（仅纯图片推文，不含图视频混合）/ 视频 / GIF / 文字 / 缺失文件；排序支持按添加时间、推文时间和视频时长
+- **网格**：瀑布流卡片，悬停预览正文，视频卡片显示时长角标
+- **灯箱**：多媒体推文以轮播浏览（缩略图切换 + 键盘左右键），可跳转原推、在 Finder 中显示文件、删除书签（可选同时删除已下载文件）
+- **下载进度**：有媒体在下载时，页面顶部显示实时进度条
 
 ## 命令行工具
 
@@ -80,29 +80,14 @@ https://x.com/i/history
 
 首次运行服务时会生成 `config.json`：
 
-```json
+```jsonc
 {
+  // 媒体保存目录：相对路径基于运行 ./tbd 的目录，支持项目外的任意文件夹，
+  // 包括外接硬盘，例如 "/Volumes/Archive/x-media"；
   "media_dir": "media",
   "download_videos": true,
-  "download_images": true
+  "download_images": true,
 }
-```
-
-通常不需要手动编辑——视频和图片下载可以直接在页面控制面板里开关。
-
-## 项目结构
-
-```text
-cmd/tbd/            程序入口
-internal/config/    设置文件读写
-internal/logx/      终端输出
-internal/store/     SQLite 与数据模型
-internal/twitter/   X API 响应解析
-internal/syncer/    书签同步逻辑
-internal/download/  媒体下载 worker
-internal/server/    HTTP API 与仪表盘
-internal/export/    导出 @handles
-web/                Tampermonkey 用户脚本
 ```
 
 ## 常见问题
@@ -117,7 +102,7 @@ web/                Tampermonkey 用户脚本
 
 **更新脚本后没有生效？**
 
-回到 Tampermonkey，把 [web/sync-bookmarks.user.js](./web/sync-bookmarks.user.js) 的最新内容重新复制进去并保存。
+回到 Tampermonkey，把 [web/sync-bookmarks.user.js](https://raw.githubusercontent.com/disinfeqt/tbd/main/web/sync-bookmarks.user.js) 的最新内容重新复制进去并保存。
 
 ## 许可证
 
