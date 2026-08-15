@@ -264,6 +264,7 @@ type progressWriter struct {
 func (pw *progressWriter) Write(p []byte) (int, error) {
 	n := len(p)
 	pw.written += int64(n)
+	trackProgress(pw.outputPath, pw.written)
 
 	now := time.Now()
 	if now.Sub(pw.lastLog) >= downloadProgressInterval {
@@ -362,6 +363,9 @@ func downloadFile(urlStr string, outputPath string, modTime time.Time, progressL
 	} else {
 		logx.Infof("  [Download %s] Starting: %s (unknown size)", progressLabel, outputPath)
 	}
+
+	untrack := trackDownload(outputPath, resp.ContentLength)
+	defer untrack()
 
 	tmpPath := outputPath + ".part"
 	if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {

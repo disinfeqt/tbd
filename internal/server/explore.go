@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"html"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -37,6 +38,9 @@ func registerExploreRoutes() {
 	http.HandleFunc("/api/explore/missing", handleExploreMissing)
 	http.HandleFunc("/api/explore/missing/fix", handleExploreMissingFix)
 	http.HandleFunc("/api/explore/reveal", handleExploreReveal)
+	http.HandleFunc("/api/explore/authors", handleExploreAuthors)
+	http.HandleFunc("/api/explore/logs", handleExploreLogs)
+	http.HandleFunc("/api/explore/downloads", handleExploreDownloads)
 	http.HandleFunc("/media/", handleMediaFile)
 }
 
@@ -254,8 +258,17 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	author := strings.TrimSpace(r.URL.Query().Get("author"))
 	mediaType := r.URL.Query().Get("type")
-	sortOrder := "created_at DESC"
-	if r.URL.Query().Get("sort") == "oldest" {
+	month := r.URL.Query().Get("month") // "2006-01", filters by tweet date
+	// Default sorts use when the bookmark was added to the archive (created_at
+	// breaks ties for rows imported in the same instant); the tweet-* sorts
+	// use the tweet's own date.
+	sortOrder := "synced_at DESC, created_at DESC"
+	switch r.URL.Query().Get("sort") {
+	case "oldest":
+		sortOrder = "synced_at ASC, created_at ASC"
+	case "tweet-newest":
+		sortOrder = "created_at DESC"
+	case "tweet-oldest":
 		sortOrder = "created_at ASC"
 	}
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -269,13 +282,29 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 		query := store.DB.Model(&store.TweetModel{})
 		if q != "" {
 			like := "%" + escapeLike(q) + "%"
-			query = query.Where(
-				`(full_text LIKE ? ESCAPE '\' OR screen_name LIKE ? ESCAPE '\' OR name LIKE ? ESCAPE '\')`,
-				like, like, like,
-			)
+			// full_text is stored HTML-escaped, so "&" in a query must also
+			// match its entity form.
+			entityQ := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(q)
+			if entityQ != q {
+				query = query.Where(
+					`(full_text LIKE ? ESCAPE '\' OR full_text LIKE ? ESCAPE '\' OR screen_name LIKE ? ESCAPE '\' OR name LIKE ? ESCAPE '\')`,
+					like, "%"+escapeLike(entityQ)+"%", like, like,
+				)
+			} else {
+				query = query.Where(
+					`(full_text LIKE ? ESCAPE '\' OR screen_name LIKE ? ESCAPE '\' OR name LIKE ? ESCAPE '\')`,
+					like, like, like,
+				)
+			}
 		}
 		if author != "" {
 			query = query.Where("LOWER(screen_name) = LOWER(?)", author)
+		}
+		if start, err := time.ParseInLocation("2006-01", month, time.Local); err == nil {
+			// datetime() normalizes both sides to UTC — stored values and bound
+			// params carry different offsets, and raw comparison is lexical.
+			query = query.Where("datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?)",
+				start, start.AddDate(0, 1, 0))
 		}
 		return query
 	}
@@ -345,10 +374,11 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 
 func exploreItemFromTweet(tweet *store.TweetModel) exploreTweetItem {
 	item := exploreTweetItem{
-		ID:           tweet.ID,
-		Name:         tweet.Name,
-		ScreenName:   tweet.ScreenName,
-		FullText:     tweet.FullText,
+		ID:         tweet.ID,
+		Name:       tweet.Name,
+		ScreenName: tweet.ScreenName,
+		// X stores full_text HTML-escaped (& < > become entities).
+		FullText: html.UnescapeString(tweet.FullText),
 		CreatedAt:    tweet.CreatedAt,
 		PermanentURL: tweet.PermanentURL,
 		Media:        []exploreMediaItem{},
@@ -377,6 +407,67 @@ func exploreItemFromTweet(tweet *store.TweetModel) exploreTweetItem {
 	return item
 }
 
+// handleExploreDownloads reports queue counts and in-flight file progress for
+// the dashboard's download strip.
+func handleExploreDownloads(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	status, err := download.Status()
+	if err != nil {
+		logx.Error(eris.Wrap(err, "Failed to read download status"))
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, status)
+}
+
+// handleExploreLogs returns recent log entries for the activity view; pass
+// after=<id> to receive only newer entries (long-poll friendly).
+func handleExploreLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
+	items := logx.Recent(after)
+	lastID := after
+	if len(items) > 0 {
+		lastID = items[len(items)-1].ID
+	}
+	writeJSON(w, map[string]any{
+		"items":   items,
+		"last_id": lastID,
+	})
+}
+
+// handleExploreAuthors lists every author with their bookmark count, most
+// bookmarked first.
+func handleExploreAuthors(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var rows []authorStat
+	if err := store.DB.Model(&store.TweetModel{}).
+		Select("screen_name, MAX(name) AS name, COUNT(*) AS count").
+		Where("screen_name != ''").
+		Group("LOWER(screen_name)").
+		Order("count DESC, LOWER(screen_name) ASC").
+		Find(&rows).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to query authors"))
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"total": len(rows),
+		"items": rows,
+	})
+}
+
 // handleExploreMissing lists bookmarks whose downloaded media files are all
 // gone from disk (each vanished file flagged). A bookmark with at least one
 // surviving file is not considered missing — same rule as -fix-deleted-media.
@@ -396,7 +487,7 @@ func handleExploreMissing(w http.ResponseWriter, r *http.Request) {
 	if err := store.DB.
 		Where("EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id AND media.downloaded = ?)", true).
 		Preload("Media", func(db *gorm.DB) *gorm.DB { return db.Order(`"index" ASC`) }).
-		Order("created_at DESC").
+		Order("synced_at DESC, created_at DESC").
 		Find(&tweets).Error; err != nil {
 		logx.Error(eris.Wrap(err, "Failed to query tweets for missing media"))
 		http.Error(w, "Database error", http.StatusInternalServerError)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/rotisserie/eris"
 
@@ -19,6 +20,7 @@ import (
 
 func main() {
 	repairMedia := flag.Bool("repair-media", false, "Repair video media URLs from stored raw tweet JSON and exit")
+	fixDeletedMedia := flag.Bool("fix-deleted-media", false, "Remove bookmarks whose downloaded media files were all deleted from the media folder (the folder is the source of truth) and exit")
 	exportHandles := flag.Bool("export-handles", false, "Export unique @ handles to JSON and exit")
 	handlesOutput := flag.String("handles-output", "handles.json", "Output path for --export-handles")
 	reset := flag.Bool("reset", false, "Delete the bookmarks database and logs after confirmation (media files are never touched) and exit")
@@ -51,6 +53,11 @@ func main() {
 		return
 	}
 
+	if *fixDeletedMedia {
+		runFixDeletedMedia()
+		return
+	}
+
 	repaired, err := download.RepairVideoMediaURLs()
 	if err != nil {
 		logx.Fatal(eris.Wrap(err, "Failed to repair video media URLs"))
@@ -62,6 +69,14 @@ func main() {
 		return
 	}
 
+	// Backfill media dimensions (from raw tweet JSON, else file headers) so
+	// the explorer can reserve layout space; no-op once everything is filled.
+	if filled, err := download.BackfillMediaDimensions(); err != nil {
+		logx.Error(eris.Wrap(err, "Failed to backfill media dimensions"))
+	} else if filled > 0 {
+		logx.Infof("Backfilled dimensions for %d media records", filled)
+	}
+
 	// 4. Start Background Download Worker
 	go download.StartWorker()
 
@@ -69,6 +84,39 @@ func main() {
 	if err := server.Start("127.0.0.1:41008"); err != nil {
 		logx.Fatal(eris.Wrap(err, "Server failed"))
 	}
+}
+
+func runFixDeletedMedia() {
+	tweets, err := download.FindTweetsWithDeletedMedia()
+	if err != nil {
+		logx.Fatal(err)
+	}
+	if len(tweets) == 0 {
+		fmt.Println("Nothing to fix — every bookmark still has its downloaded media in place.")
+		return
+	}
+
+	fmt.Printf("%d bookmark(s) have had all their downloaded media deleted from the media folder:\n", len(tweets))
+	for i, tweet := range tweets {
+		if i == 10 {
+			fmt.Printf("  … and %d more\n", len(tweets)-10)
+			break
+		}
+		fmt.Printf("  @%s · %s · %s\n", tweet.ScreenName, tweet.CreatedAt.In(time.Local).Format("2006-01-02"), tweet.ID)
+	}
+	fmt.Println("These bookmarks and their media records will be removed from the database.")
+	fmt.Print(`Type "yes" to continue: `)
+
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	if strings.TrimSpace(line) != "yes" {
+		fmt.Println("Cancelled — nothing was removed.")
+		return
+	}
+
+	if err := download.RemoveTweets(tweets); err != nil {
+		logx.Fatal(eris.Wrap(err, "Failed to remove bookmarks"))
+	}
+	fmt.Printf("Removed %d bookmark(s).\n", len(tweets))
 }
 
 func runReset() {

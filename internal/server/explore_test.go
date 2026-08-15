@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twitter-bookmarks-downloader/internal/config"
+	"twitter-bookmarks-downloader/internal/logx"
 	"twitter-bookmarks-downloader/internal/store"
 )
 
@@ -26,6 +29,8 @@ func seedExploreDB(t *testing.T) {
 	})
 	require.NoError(t, store.Init(":memory:"))
 
+	// SyncedAt (time added) deliberately disagrees with CreatedAt (tweet
+	// date): tweet 1 is the oldest tweet but the most recently added.
 	tweets := []store.TweetModel{
 		{
 			ID:         "1",
@@ -33,13 +38,15 @@ func seedExploreDB(t *testing.T) {
 			ScreenName: "alice",
 			FullText:   "hello go generics",
 			CreatedAt:  time.Date(2025, 1, 10, 9, 30, 0, 0, time.Local),
+			SyncedAt:   time.Date(2025, 6, 3, 0, 0, 0, 0, time.Local),
 		},
 		{
 			ID:         "2",
 			Name:       "Alice",
 			ScreenName: "alice",
-			FullText:   "another post",
+			FullText:   "salt &amp; pepper",
 			CreatedAt:  time.Date(2025, 2, 5, 22, 0, 0, 0, time.Local),
+			SyncedAt:   time.Date(2025, 6, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
 			ID:         "3",
@@ -47,6 +54,7 @@ func seedExploreDB(t *testing.T) {
 			ScreenName: "bob",
 			FullText:   "unrelated",
 			CreatedAt:  time.Date(2025, 3, 1, 12, 0, 0, 0, time.Local),
+			SyncedAt:   time.Date(2025, 6, 2, 0, 0, 0, 0, time.Local),
 			RawJSON:    `{"legacy":{"extended_entities":{"media":[{"id_str":"m1","type":"photo","media_url_https":"https://pbs.twimg.com/media/a.jpg","original_info":{"width":1200,"height":800}}]}}}`,
 			Media: []store.MediaModel{
 				{ID: "m1", TweetID: "3", Type: "photo", URL: "https://pbs.twimg.com/media/a.jpg", Downloaded: true},
@@ -101,17 +109,35 @@ func TestHandleExploreTweetsSearchAndFilter(t *testing.T) {
 	assert.EqualValues(t, 3, all["total"])
 	items := all["items"].([]any)
 	require.Len(t, items, 3)
-	// Newest first by default.
-	assert.Equal(t, "3", items[0].(map[string]any)["id"])
+	// Most recently added first by default — tweet 1 was added last even
+	// though it is the oldest tweet.
+	assert.Equal(t, "1", items[0].(map[string]any)["id"])
 
 	search := get("?q=generics")
 	assert.EqualValues(t, 1, search["total"])
+
+	// Stored entities are decoded for display and matchable with a raw "&".
+	amp := get("?q=" + url.QueryEscape("salt & pepper"))
+	assert.EqualValues(t, 1, amp["total"])
+	assert.Equal(t, "salt & pepper", amp["items"].([]any)[0].(map[string]any)["full_text"])
 
 	byAuthor := get("?author=ALICE")
 	assert.EqualValues(t, 2, byAuthor["total"])
 
 	oldest := get("?sort=oldest")
-	assert.Equal(t, "1", oldest["items"].([]any)[0].(map[string]any)["id"])
+	assert.Equal(t, "2", oldest["items"].([]any)[0].(map[string]any)["id"])
+
+	// Tweet-date sorts ignore when the bookmark was added.
+	tweetNewest := get("?sort=tweet-newest")
+	assert.Equal(t, "3", tweetNewest["items"].([]any)[0].(map[string]any)["id"])
+	tweetOldest := get("?sort=tweet-oldest")
+	assert.Equal(t, "1", tweetOldest["items"].([]any)[0].(map[string]any)["id"])
+
+	// Month filter uses the tweet date.
+	january := get("?month=2025-01")
+	assert.EqualValues(t, 1, january["total"])
+	assert.Equal(t, "1", january["items"].([]any)[0].(map[string]any)["id"])
+	assert.EqualValues(t, 0, get("?month=2025-06")["total"])
 
 	// Downloaded media gets a computed local filename.
 	withMedia := get("?author=bob")
@@ -230,6 +256,73 @@ func TestHandleExploreMissingAndDelete(t *testing.T) {
 	handleExploreDeleteTweet(rec404, httptest.NewRequest(http.MethodPost,
 		"/api/explore/tweets/delete", strings.NewReader(`{"id":"nope"}`)))
 	assert.Equal(t, http.StatusNotFound, rec404.Code)
+}
+
+func TestHandleExploreDownloads(t *testing.T) {
+	seedExploreDB(t)
+	// One video pending download alongside bob's downloaded photo.
+	require.NoError(t, store.DB.Create(&store.MediaModel{
+		ID: "m2", TweetID: "2", Type: "video", URL: "https://video.twimg.com/v.mp4",
+	}).Error)
+
+	rec := httptest.NewRecorder()
+	handleExploreDownloads(rec, httptest.NewRequest(http.MethodGet, "/api/explore/downloads", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	assert.EqualValues(t, 2, payload["total"])
+	assert.EqualValues(t, 1, payload["downloaded"])
+	assert.EqualValues(t, 1, payload["pending"])
+	assert.EqualValues(t, 0, payload["failed"])
+}
+
+func TestHandleExploreLogs(t *testing.T) {
+	logx.Info("hello from the test")
+
+	rec := httptest.NewRecorder()
+	handleExploreLogs(rec, httptest.NewRequest(http.MethodGet, "/api/explore/logs", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload struct {
+		Items  []logx.Entry `json:"items"`
+		LastID int64        `json:"last_id"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	require.NotEmpty(t, payload.Items)
+	last := payload.Items[len(payload.Items)-1]
+	assert.Equal(t, "info", last.Level)
+	assert.Equal(t, "hello from the test", last.Msg)
+	assert.Equal(t, last.ID, payload.LastID)
+
+	// after=<last id> returns nothing new.
+	rec2 := httptest.NewRecorder()
+	handleExploreLogs(rec2, httptest.NewRequest(http.MethodGet,
+		"/api/explore/logs?after="+strconv.FormatInt(payload.LastID, 10), nil))
+	require.Equal(t, http.StatusOK, rec2.Code)
+	var payload2 struct {
+		Items []logx.Entry `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal(rec2.Body.Bytes(), &payload2))
+	assert.Empty(t, payload2.Items)
+}
+
+func TestHandleExploreAuthors(t *testing.T) {
+	seedExploreDB(t)
+
+	rec := httptest.NewRecorder()
+	handleExploreAuthors(rec, httptest.NewRequest(http.MethodGet, "/api/explore/authors", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	assert.EqualValues(t, 2, payload["total"])
+	items := payload["items"].([]any)
+	require.Len(t, items, 2)
+	first := items[0].(map[string]any)
+	assert.Equal(t, "alice", first["screen_name"])
+	assert.EqualValues(t, 2, first["count"])
+	assert.Equal(t, "bob", items[1].(map[string]any)["screen_name"])
 }
 
 func TestHandleExploreReveal(t *testing.T) {

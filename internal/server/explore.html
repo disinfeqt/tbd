@@ -26,6 +26,8 @@
         --badge-ink: #ffffff;
         --lightbox: rgba(18, 18, 16, 0.82);
         --danger: #b3372f;
+        --ok: #2e7d32;
+        --warnc: #b45309;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -45,11 +47,16 @@
           --badge-ink: #ffffff;
           --lightbox: rgba(5, 5, 4, 0.86);
           --danger: #e06055;
+          --ok: #6abf73;
+          --warnc: #f0a24a;
         }
       }
 
       * {
         box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
       }
       body {
         margin: 0;
@@ -83,18 +90,285 @@
         font-weight: 700;
         margin: 0;
       }
+      header.page h1 button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+      }
+      header.page h1 button:hover {
+        color: var(--accent);
+      }
+      header.page h1 button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
       .statline {
-        font-size: 13px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 12.5px;
         color: var(--muted);
         font-variant-numeric: tabular-nums;
       }
-      .statline b {
+      .statline .stat {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+        font: inherit;
         color: var(--ink-2);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 3px 12px;
+      }
+      .statline .stat b {
+        color: var(--ink);
         font-weight: 600;
       }
-      .statline .dot {
-        margin: 0 6px;
-        opacity: 0.6;
+      .statline button.stat {
+        cursor: pointer;
+        transition:
+          border-color 0.15s ease,
+          color 0.15s ease;
+      }
+      .statline button.stat:hover {
+        color: var(--ink);
+        border-color: var(--muted);
+      }
+      .statline button.stat:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .statline .stat.live::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--ok);
+      }
+
+      /* ---- Subpages (authors / media / timeline) ---- */
+      .sphead {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 14px 0 14px;
+      }
+      .spback {
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink-2);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 14px;
+        cursor: pointer;
+      }
+      .spback:hover {
+        color: var(--ink);
+        border-color: var(--muted);
+      }
+      .sptitle {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .spsummary {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .spbody {
+        display: flex;
+        flex-direction: column;
+        max-width: 720px;
+      }
+      .srow {
+        display: grid;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+        background: none;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .srow:hover {
+        background: color-mix(in srgb, var(--accent) 8%, transparent);
+      }
+      .srow.author {
+        grid-template-columns: 20px minmax(140px, 1fr) 2fr 48px;
+      }
+      .srow.plain {
+        grid-template-columns: minmax(90px, 130px) 1fr 48px;
+      }
+      .srow .swho {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .srow .swho b {
+        font-weight: 600;
+      }
+      .srow .shandle {
+        color: var(--muted);
+        font-size: 12.5px;
+        margin-left: 6px;
+      }
+      .srow .slabel {
+        font-size: 13px;
+        color: var(--ink-2);
+        white-space: nowrap;
+      }
+      .srow .strack {
+        height: 10px;
+        position: relative;
+      }
+      .srow .sbar {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--accent);
+        opacity: 0.7;
+        border-radius: 0 3px 3px 0;
+        min-width: 2px;
+      }
+      .srow .scount {
+        font-size: 12px;
+        font-weight: 600;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .spnote {
+        color: var(--muted);
+        padding: 12px 0;
+      }
+      .spbody.wide {
+        max-width: 960px;
+      }
+      .loglist {
+        max-height: 70vh;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        padding: 8px 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .logrow {
+        display: grid;
+        grid-template-columns: 66px 14px 1fr;
+        gap: 8px;
+        padding: 1px 14px;
+        align-items: baseline;
+      }
+      .logrow .ltime {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .logrow .lmark {
+        text-align: center;
+        font-weight: 700;
+      }
+      .logrow.info .lmark {
+        color: var(--ok);
+      }
+      .logrow.warn .lmark {
+        color: var(--warnc);
+      }
+      .logrow.error .lmark {
+        color: var(--danger);
+      }
+      .logrow .lmsg {
+        color: var(--ink-2);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .logrow.error .lmsg {
+        color: var(--danger);
+      }
+
+      /* ---- Download progress strip ---- */
+      #dlstrip {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 14px;
+      }
+      .dlhead {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 13px;
+        color: var(--ink-2);
+        margin-bottom: 8px;
+      }
+      #dlpct {
+        font-weight: 600;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      .dltrack {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--grid);
+        overflow: hidden;
+      }
+      .dlbar {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 3px;
+        transition: width 0.6s ease;
+      }
+      #dlfiles {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 8px;
+      }
+      .dlfile {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 120px 56px;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .dlfile .fname {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .dlfile .ftrack {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--grid);
+        overflow: hidden;
+      }
+      .dlfile .fbar {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+        opacity: 0.75;
+        transition: width 0.6s ease;
+      }
+      .dlfile .fpct {
+        text-align: right;
       }
 
       /* ---- Sticky filter bar ---- */
@@ -612,6 +886,15 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      .lb-text a,
+      .lb-quote a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .lb-text a:hover,
+      .lb-quote a:hover {
+        text-decoration: underline;
+      }
       .lb-date {
         align-self: flex-start;
         font-size: 12.5px;
@@ -759,9 +1042,20 @@
   <body>
     <main>
       <header class="page">
-        <h1>TBD Explorer</h1>
+        <h1>
+          <button id="home" title="Show all bookmarks">TBD Explorer</button>
+        </h1>
         <div class="statline" id="statline">Your X bookmarks archive</div>
       </header>
+
+      <div id="dlstrip" hidden>
+        <div class="dlhead">
+          <span id="dltext"></span>
+          <span id="dlpct"></span>
+        </div>
+        <div class="dltrack"><div class="dlbar" id="dlbar"></div></div>
+        <div id="dlfiles"></div>
+      </div>
 
       <div class="bar">
         <div class="search">
@@ -784,8 +1078,10 @@
         ></div>
         <span class="selwrap">
           <select id="sort" aria-label="Sort order">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
+            <option value="newest">Recently added</option>
+            <option value="oldest">Oldest added</option>
+            <option value="tweet-newest">Newest tweets</option>
+            <option value="tweet-oldest">Oldest tweets</option>
           </select>
         </span>
       </div>
@@ -793,6 +1089,12 @@
       <span id="chip" class="chip" hidden>
         <span></span
         ><button title="Clear author filter" aria-label="Clear author filter">
+          ×
+        </button>
+      </span>
+      <span id="mchip" class="chip" hidden>
+        <span></span
+        ><button title="Clear month filter" aria-label="Clear month filter">
           ×
         </button>
       </span>
@@ -805,6 +1107,7 @@
       <div class="sentinel" id="more" hidden aria-hidden="true">
         Loading more…
       </div>
+      <section id="subpage" hidden></section>
     </main>
 
     <div id="lb" role="dialog" aria-modal="true" aria-label="Bookmark detail">
@@ -895,9 +1198,11 @@
 
       /* ---- State ---- */
       const state = {
+        view: "grid", // grid | authors | media | timeline
         q: "",
         type: "all",
         author: "",
+        month: "",
         sort: "newest",
         page: 1,
         total: 0,
@@ -905,36 +1210,52 @@
         items: [],
       };
       let fetchController = null;
+      let statsCache = null;
 
-      /* ---- Header stats: one quiet line ---- */
-      async function loadStats() {
+      async function ensureStats() {
+        if (statsCache) return statsCache;
         const res = await fetch("/api/explore/stats");
         if (!res.ok) throw new Error("stats request failed");
-        const stats = await res.json();
+        statsCache = await res.json();
+        return statsCache;
+      }
+
+      /* ---- Header stats: one quiet line, each a door to a subpage ---- */
+      async function loadStats() {
+        const stats = await ensureStats();
         const line = $("#statline");
         line.textContent = "";
-        const add = (value, label) => {
-          if (line.children.length) line.append(el("span", "dot", "·"));
-          const b = el("b", "", value);
-          line.append(b, " " + label);
+        const add = (value, label, onClick) => {
+          const s = el(onClick ? "button" : "span", "stat");
+          if (value != null) s.append(el("b", "", value), " ");
+          s.append(label);
+          if (onClick) s.addEventListener("click", onClick);
+          line.append(s);
+          return s;
         };
-        add(fmt(stats.totals.bookmarks), "bookmarks");
+        add(fmt(stats.totals.bookmarks), "bookmarks", goHome);
+        // Only show the fraction while downloads are still catching up.
+        const downloaded = stats.totals.media_downloaded;
+        const mediaTotal = stats.totals.media_total;
         add(
-          fmt(stats.totals.media_downloaded) +
-            " / " +
-            fmt(stats.totals.media_total),
+          downloaded < mediaTotal
+            ? fmt(downloaded) + " / " + fmt(mediaTotal)
+            : fmt(mediaTotal),
           "media files",
+          () => setView("media"),
         );
-        add(fmt(stats.totals.authors), "authors");
+        add(fmt(stats.totals.authors), "authors", () => setView("authors"));
         if (stats.first_bookmark) {
           const opt = { year: "numeric", month: "short" };
-          line.append(
-            el("span", "dot", "·"),
+          add(
+            null,
             new Date(stats.first_bookmark).toLocaleDateString(undefined, opt) +
               " – " +
               new Date(stats.last_bookmark).toLocaleDateString(undefined, opt),
+            () => setView("timeline"),
           );
         }
+        add(null, "Activity", () => setView("activity")).classList.add("live");
       }
 
       /* ---- Tabs with live counts ---- */
@@ -1129,6 +1450,7 @@
         const p = new URLSearchParams();
         if (state.q) p.set("q", state.q);
         if (state.author) p.set("author", state.author);
+        if (state.month) p.set("month", state.month);
         if (state.type !== "all") p.set("type", state.type);
         if (state.sort !== "newest") p.set("sort", state.sort);
         p.set("page", String(state.page));
@@ -1303,13 +1625,15 @@
         { rootMargin: "600px 0px" },
       ).observe($("#more"));
 
-      // Mirror the active filters into the URL so views are shareable and
-      // survive a reload; defaults are omitted to keep the URL clean.
+      // Mirror the active view and filters into the URL so views are
+      // shareable and survive a reload; defaults are omitted to keep it clean.
       function syncURL() {
         const p = new URLSearchParams();
+        if (state.view !== "grid") p.set("view", state.view);
         if (state.q) p.set("q", state.q);
         if (state.type !== "all") p.set("type", state.type);
         if (state.author) p.set("author", state.author);
+        if (state.month) p.set("month", state.month);
         if (state.sort !== "newest") p.set("sort", state.sort);
         const qs = p.toString();
         history.replaceState(null, "", qs ? "?" + qs : location.pathname);
@@ -1322,10 +1646,262 @@
         loadPage(false);
       }
 
+      const monthName = (ym) => {
+        const [y, mo] = ym.split("-").map(Number);
+        return new Date(y, mo - 1, 1).toLocaleDateString(undefined, {
+          month: "short",
+          year: "numeric",
+        });
+      };
+
       function updateChip() {
         const chip = $("#chip");
         chip.hidden = !state.author;
         if (state.author) $("span", chip).textContent = "@" + state.author;
+        const mchip = $("#mchip");
+        mchip.hidden = !state.month;
+        if (state.month) $("span", mchip).textContent = monthName(state.month);
+      }
+
+      /* ---- Subpages ---- */
+      function applyView() {
+        const inGrid = state.view === "grid";
+        for (const sel of [".bar", ".countbar", "#grid"])
+          $(sel).hidden = !inGrid;
+        if (!inGrid) {
+          $("#more").hidden = true;
+          $("#chip").hidden = true;
+          $("#mchip").hidden = true;
+          $("#fixall").hidden = true;
+        }
+        $("#subpage").hidden = inGrid;
+      }
+
+      function setView(view) {
+        state.view = view;
+        syncURL();
+        applyView();
+        if (view === "grid") resetAndLoad();
+        else renderSubpage();
+      }
+
+      // Subpage counts are archive-wide, so navigating from a subpage row
+      // starts from a clean slate — lingering filters would contradict the
+      // count that was just clicked.
+      function clearFilters() {
+        state.q = "";
+        $("#q").value = "";
+        state.type = "all";
+        state.author = "";
+        state.month = "";
+      }
+
+      // Logo / "bookmarks" stat: back to the unfiltered grid.
+      function goHome() {
+        clearFilters();
+        state.sort = "newest";
+        $("#sort").value = "newest";
+        setView("grid");
+      }
+
+      const VIEW_TITLES = {
+        authors: "Authors",
+        media: "Media",
+        timeline: "Timeline",
+        activity: "Activity",
+      };
+
+      async function renderSubpage() {
+        const sp = $("#subpage");
+        sp.textContent = "";
+        const head = el("div", "sphead");
+        const back = el("button", "spback", "← Bookmarks");
+        back.addEventListener("click", () => setView("grid"));
+        head.append(back, el("h2", "sptitle", VIEW_TITLES[state.view] || ""));
+        sp.append(head);
+        const body = el("div", "spbody");
+        sp.append(body);
+        body.append(el("div", "spnote", "Loading…"));
+        try {
+          if (state.view === "authors") await renderAuthors(body);
+          else if (state.view === "media") await renderMedia(body);
+          else if (state.view === "timeline") await renderTimeline(body);
+          else if (state.view === "activity") await renderActivity(body);
+        } catch {
+          body.textContent = "";
+          body.append(
+            el("div", "spnote", "Could not load — is the local app running?"),
+          );
+        }
+      }
+
+      function statRow(cls, cells, count, max, onClick) {
+        const row = el("button", "srow " + cls);
+        for (const cell of cells) row.append(cell);
+        const track = el("span", "strack");
+        const bar = el("span", "sbar");
+        bar.style.width = (100 * count) / max + "%";
+        track.append(bar);
+        row.append(track, el("span", "scount", fmt(count)));
+        row.addEventListener("click", onClick);
+        return row;
+      }
+
+      let authorsCache = null;
+      async function renderAuthors(body) {
+        if (!authorsCache) {
+          const res = await fetch("/api/explore/authors");
+          if (!res.ok) throw new Error("authors request failed");
+          authorsCache = (await res.json()).items;
+        }
+        body.textContent = "";
+        if (!authorsCache.length) {
+          body.append(el("div", "spnote", "No authors yet."));
+          return;
+        }
+        const max = Math.max(1, ...authorsCache.map((a) => a.count));
+        for (const a of authorsCache) {
+          const who = el("span", "swho");
+          who.append(el("b", "", a.name || a.screen_name));
+          who.append(el("span", "shandle", "@" + a.screen_name));
+          body.append(
+            statRow(
+              "author",
+              [avatarEl({ screen_name: a.screen_name, name: a.name }), who],
+              a.count,
+              max,
+              () => {
+                clearFilters();
+                state.author = a.screen_name;
+                setView("grid");
+              },
+            ),
+          );
+        }
+      }
+
+      async function renderMedia(body) {
+        const stats = await ensureStats();
+        body.textContent = "";
+        const summary =
+          fmt(stats.totals.media_downloaded) +
+          " of " +
+          fmt(stats.totals.media_total) +
+          " files downloaded" +
+          (stats.totals.media_failed > 0
+            ? " · " + fmt(stats.totals.media_failed) + " failed"
+            : "");
+        body.append(el("p", "spsummary", summary));
+        const LABELS = {
+          photo: ["Photos", "photo"],
+          video: ["Videos", "video"],
+          animated_gif: ["GIFs", "gif"],
+        };
+        const types = (stats.media_types || []).filter((mt) => LABELS[mt.type]);
+        if (!types.length) {
+          body.append(el("div", "spnote", "No media yet."));
+          return;
+        }
+        const max = Math.max(1, ...types.map((mt) => mt.count));
+        for (const mt of types) {
+          const [label, tab] = LABELS[mt.type];
+          body.append(
+            statRow("plain", [el("span", "slabel", label)], mt.count, max, () => {
+              clearFilters();
+              state.type = tab;
+              setView("grid");
+            }),
+          );
+        }
+      }
+
+      /* ---- Activity: live tail of the app's log ---- */
+      let logTimer = null;
+      let logLastId = 0;
+      function logRow(entry) {
+        const row = el("div", "logrow " + entry.level);
+        const marks = { info: "•", warn: "!", error: "✗" };
+        row.append(
+          el(
+            "span",
+            "ltime",
+            new Date(entry.time).toLocaleTimeString(undefined, {
+              hour12: false,
+            }),
+          ),
+          el("span", "lmark", marks[entry.level] || "•"),
+          el("span", "lmsg", entry.msg),
+        );
+        return row;
+      }
+      async function renderActivity(body) {
+        body.classList.add("wide");
+        body.textContent = "";
+        const list = el("div", "loglist");
+        body.append(list);
+        logLastId = 0;
+        clearInterval(logTimer);
+
+        const poll = async () => {
+          if (state.view !== "activity") {
+            clearInterval(logTimer);
+            logTimer = null;
+            return;
+          }
+          let data;
+          try {
+            const res = await fetch("/api/explore/logs?after=" + logLastId);
+            if (!res.ok) throw new Error();
+            data = await res.json();
+          } catch {
+            return; // transient; try again next tick
+          }
+          if (!data.items.length) {
+            if (!list.children.length)
+              list.append(el("div", "spnote", "No activity yet."));
+            return;
+          }
+          const note = list.querySelector(".spnote");
+          if (note) note.remove();
+          // Follow the tail only if the user is already at the bottom.
+          const stick =
+            list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+          for (const entry of data.items) list.append(logRow(entry));
+          while (list.children.length > 500) list.firstChild.remove();
+          logLastId = data.last_id;
+          if (stick) list.scrollTop = list.scrollHeight;
+        };
+        await poll();
+        list.scrollTop = list.scrollHeight;
+        logTimer = setInterval(poll, 2000);
+      }
+
+      async function renderTimeline(body) {
+        const stats = await ensureStats();
+        body.textContent = "";
+        const monthly = (stats.monthly || [])
+          .filter((m) => m.count > 0) // gap months add noise, not information
+          .reverse(); // newest first
+        if (!monthly.length) {
+          body.append(el("div", "spnote", "No bookmarks yet."));
+          return;
+        }
+        const max = Math.max(1, ...monthly.map((m) => m.count));
+        for (const m of monthly) {
+          body.append(
+            statRow(
+              "plain",
+              [el("span", "slabel", monthName(m.month))],
+              m.count,
+              max,
+              () => {
+                clearFilters();
+                state.month = m.month;
+                setView("grid");
+              },
+            ),
+          );
+        }
       }
 
       /* ---- Lightbox ---- */
@@ -1341,6 +1917,34 @@
         document.body.style.overflow = "";
         $("#lbmedia").textContent = ""; // stop any playing video
       }
+      /* ---- Linkify URLs, @mentions, and #hashtags in tweet text ---- */
+      const LINKIFY_RE =
+        /(https?:\/\/[^\s]+)|((?<![\w@])@[A-Za-z0-9_]{1,15})|((?<![\w#])#[\p{L}\p{N}_]+)/gu;
+      function linkify(text) {
+        const frag = document.createDocumentFragment();
+        let last = 0;
+        for (const m of text.matchAll(LINKIFY_RE)) {
+          let s = m[0];
+          if (m[1]) {
+            // Trailing punctuation belongs to the sentence, not the URL.
+            const trimmed = s.replace(/[.,;:!?)'"\]]+$/, "");
+            s = trimmed || s;
+          }
+          if (m.index > last) frag.append(text.slice(last, m.index));
+          const a = document.createElement("a");
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = s;
+          if (m[1]) a.href = s;
+          else if (m[2]) a.href = "https://x.com/" + s.slice(1);
+          else a.href = "https://x.com/hashtag/" + encodeURIComponent(s.slice(1));
+          frag.append(a);
+          last = m.index + s.length;
+        }
+        if (last < text.length) frag.append(text.slice(last));
+        return frag;
+      }
+
       function fillLb() {
         const t = state.items[lbIndex];
         if (!t) return;
@@ -1349,7 +1953,9 @@
         const media = t.media || [];
         let firstVideo = null;
         if (!media.length) {
-          m.append(el("div", "lb-quote", t.full_text || "(no text)"));
+          const quote = el("div", "lb-quote");
+          quote.append(linkify(t.full_text || "(no text)"));
+          m.append(quote);
         } else {
           for (const item of media) {
             if (!item.file || item.missing) {
@@ -1401,7 +2007,9 @@
         $("#lbfilter").hidden = !t.screen_name;
         if (t.screen_name)
           $("#lbfilter").textContent = "More from @" + t.screen_name;
-        $("#lbtext").textContent = t.full_text || "";
+        const lbtext = $("#lbtext");
+        lbtext.textContent = "";
+        lbtext.append(linkify(t.full_text || ""));
         $("#lbdate").textContent = fmtDate(t.created_at) + " ↗";
         $("#lbdate").href = t.permanent_url || "#";
         $("#lbreveal").hidden = !(t.media || []).some(
@@ -1531,7 +2139,71 @@
       $("#lbkeep").addEventListener("click", () => removeTweet(false));
       $("#lbdelfiles").addEventListener("click", () => removeTweet(true));
 
+      /* ---- Download progress strip ---- */
+      const fmtBytes = (n) => {
+        if (n < 1024) return n + " B";
+        const units = ["KB", "MB", "GB"];
+        let u = -1;
+        do {
+          n /= 1024;
+          u++;
+        } while (n >= 1024 && u < units.length - 1);
+        return n.toFixed(1) + " " + units[u];
+      };
+      let dlWasBusy = false;
+      let dlTimer = null;
+      async function pollDownloads() {
+        let data = null;
+        try {
+          const res = await fetch("/api/explore/downloads");
+          if (res.ok) data = await res.json();
+        } catch {
+          data = null;
+        }
+        const busy =
+          !!data && (data.pending > 0 || (data.active || []).length > 0);
+        $("#dlstrip").hidden = !busy;
+        if (busy) {
+          const target = data.downloaded + data.pending;
+          const pct = target
+            ? Math.floor((100 * data.downloaded) / target)
+            : 0;
+          $("#dltext").textContent =
+            "Downloading media — " +
+            fmt(data.downloaded) +
+            " of " +
+            fmt(target) +
+            (data.failed > 0 ? " · " + fmt(data.failed) + " failed" : "");
+          $("#dlpct").textContent = pct + "%";
+          $("#dlbar").style.width = pct + "%";
+          const files = $("#dlfiles");
+          files.textContent = "";
+          for (const f of data.active || []) {
+            const row = el("div", "dlfile");
+            row.append(el("span", "fname", f.file));
+            const track = el("span", "ftrack");
+            const bar = el("span", "fbar");
+            const fp = f.total > 0 ? Math.floor((100 * f.written) / f.total) : 0;
+            bar.style.width = (f.total > 0 ? fp : 100) + "%";
+            track.append(bar);
+            row.append(track);
+            row.append(
+              el("span", "fpct", f.total > 0 ? fp + "%" : fmtBytes(f.written)),
+            );
+            files.append(row);
+          }
+        } else if (dlWasBusy) {
+          // Queue just drained — refresh the header stats.
+          statsCache = null;
+          loadStats().catch(() => {});
+        }
+        dlWasBusy = busy;
+        clearTimeout(dlTimer);
+        dlTimer = setTimeout(pollDownloads, busy ? 2000 : 15000);
+      }
+
       /* ---- Controls ---- */
+      $("#home").addEventListener("click", goHome);
       let debounceTimer = null;
       $("#q").addEventListener("input", (e) => {
         clearTimeout(debounceTimer);
@@ -1548,15 +2220,26 @@
         state.author = "";
         resetAndLoad();
       });
+      $("#mchip button").addEventListener("click", () => {
+        state.month = "";
+        resetAndLoad();
+      });
 
       /* ---- Boot ---- */
       (function initFromURL() {
         const p = new URLSearchParams(location.search);
+        const view = p.get("view");
+        if (["authors", "media", "timeline", "activity"].includes(view))
+          state.view = view;
         state.q = (p.get("q") || "").trim();
         const type = p.get("type") || "all";
         if (KIND_TABS.some(([key]) => key === type)) state.type = type;
         state.author = (p.get("author") || "").trim();
-        if (p.get("sort") === "oldest") state.sort = "oldest";
+        if (/^\d{4}-\d{2}$/.test(p.get("month") || ""))
+          state.month = p.get("month");
+        const sort = p.get("sort");
+        if (["oldest", "tweet-newest", "tweet-oldest"].includes(sort))
+          state.sort = sort;
         $("#q").value = state.q;
         $("#sort").value = state.sort;
       })();
@@ -1565,7 +2248,10 @@
         $("#statline").textContent =
           "Could not load stats — is the local app running?";
       });
-      resetAndLoad();
+      applyView();
+      if (state.view === "grid") resetAndLoad();
+      else renderSubpage();
+      pollDownloads();
     </script>
   </body>
 </html>
