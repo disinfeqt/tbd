@@ -19,8 +19,13 @@
         --grid: #e1e0d9;
         --baseline: #c3c2b7;
         --border: rgba(11, 11, 11, 0.1);
-        --series: #2a78d6;
-        --series-strong: #1c5cab;
+        --accent: #2a78d6;
+        --accent-strong: #1c5cab;
+        --scrim: rgba(12, 12, 10, 0.72);
+        --badge-bg: rgba(12, 12, 10, 0.6);
+        --badge-ink: #ffffff;
+        --lightbox: rgba(18, 18, 16, 0.82);
+        --danger: #b3372f;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -33,8 +38,13 @@
           --grid: #2c2c2a;
           --baseline: #383835;
           --border: rgba(255, 255, 255, 0.1);
-          --series: #3987e5;
-          --series-strong: #6da7ec;
+          --accent: #3987e5;
+          --accent-strong: #6da7ec;
+          --scrim: rgba(8, 8, 7, 0.78);
+          --badge-bg: rgba(8, 8, 7, 0.62);
+          --badge-ink: #ffffff;
+          --lightbox: rgba(5, 5, 4, 0.86);
+          --danger: #e06055;
         }
       }
 
@@ -54,296 +64,165 @@
         line-height: 1.5;
       }
       main {
-        max-width: 1120px;
+        max-width: 1280px;
         margin: 0 auto;
-        padding: 28px 20px 64px;
+        padding: 24px 20px 72px;
       }
 
+      /* ---- Header: identity + one quiet stats line ---- */
       header.page {
-        margin-bottom: 20px;
-      }
-      header.page h1 {
-        font-size: 22px;
-        font-weight: 700;
-        margin: 0;
-      }
-      header.page p {
-        margin: 2px 0 0;
-        color: var(--ink-2);
-        font-size: 13px;
-      }
-
-      .card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 16px 18px;
-      }
-
-      /* ---- KPI tiles ---- */
-      .kpis {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-      .tile .tlabel {
-        font-size: 12px;
-        color: var(--ink-2);
-      }
-      .tile .tvalue {
-        font-size: 28px;
-        font-weight: 600;
-        line-height: 1.2;
-        margin-top: 2px;
-      }
-      .tile .tsub {
-        font-size: 12px;
-        color: var(--muted);
-        margin-top: 2px;
-      }
-
-      /* ---- Chart cards ---- */
-      .grid2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin-top: 12px;
-      }
-      @media (max-width: 760px) {
-        .grid2 {
-          grid-template-columns: 1fr;
-        }
-      }
-      .chart-card .chead {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 8px;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
       }
-      .chart-card h3 {
-        font-size: 14px;
-        font-weight: 600;
+      header.page h1 {
+        font-size: 20px;
+        font-weight: 700;
         margin: 0;
       }
-      .chart-card .csub {
-        font-size: 12px;
+      .statline {
+        font-size: 13px;
         color: var(--muted);
-        margin: -6px 0 8px;
+        font-variant-numeric: tabular-nums;
       }
-      .tbtn {
-        font: inherit;
-        font-size: 12px;
-        color: var(--ink-2);
-        background: none;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 2px 8px;
-        cursor: pointer;
-      }
-      .tbtn[aria-pressed="true"] {
-        background: var(--grid);
-        color: var(--ink);
-      }
-      .cbody {
-        min-height: 40px;
-      }
-      .ctable {
-        overflow-x: auto;
-      }
-      .ctable table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-      }
-      .ctable th {
-        text-align: left;
+      .statline b {
         color: var(--ink-2);
         font-weight: 600;
-        padding: 4px 8px;
-        border-bottom: 1px solid var(--grid);
       }
-      .ctable td {
-        padding: 4px 8px;
-        border-bottom: 1px solid var(--grid);
-      }
-      .ctable td.num,
-      .ctable th.num {
-        text-align: right;
-        font-variant-numeric: tabular-nums;
+      .statline .dot {
+        margin: 0 6px;
+        opacity: 0.6;
       }
 
-      /* ---- SVG chart marks ---- */
-      svg {
-        display: block;
-      }
-      svg text {
-        font-family: inherit;
-      }
-      .grid-line {
-        stroke: var(--grid);
-        stroke-width: 1;
-      }
-      .baseline-line {
-        stroke: var(--baseline);
-        stroke-width: 1;
-      }
-      .tick {
-        fill: var(--muted);
-        font-size: 11px;
-        font-variant-numeric: tabular-nums;
-      }
-      .xlab {
-        fill: var(--muted);
-        font-size: 11px;
-      }
+      /* ---- Sticky filter bar ---- */
       .bar {
-        fill: var(--series);
-      }
-      .bar.hot {
-        fill: var(--series-strong);
-      }
-      .hit {
-        fill: transparent;
-        outline: none;
-      }
-      .line-mark {
-        stroke: var(--series);
-        stroke-width: 2;
-        fill: none;
-        stroke-linejoin: round;
-        stroke-linecap: round;
-      }
-      .area-mark {
-        fill: var(--series);
-        opacity: 0.1;
-      }
-      .dot {
-        fill: var(--series);
-        stroke: var(--surface);
-        stroke-width: 2;
-      }
-      .cross {
-        stroke: var(--baseline);
-        stroke-width: 1;
-      }
-      .dlabel {
-        fill: var(--ink-2);
-        font-size: 11px;
-        font-weight: 600;
-      }
-
-      /* ---- Horizontal bars (HTML) ---- */
-      .hrow {
-        display: grid;
-        grid-template-columns: 150px 1fr 48px;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 4px 0;
-        cursor: default;
-        border-radius: 6px;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 10px 0;
+        margin-bottom: 6px;
+        background: color-mix(in srgb, var(--page) 88%, transparent);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
       }
-      .hrow.clickable {
-        cursor: pointer;
-      }
-      .hrow.clickable:hover {
-        background: color-mix(in srgb, var(--series) 8%, transparent);
-      }
-      .hrow .hlabel {
-        font-size: 13px;
-        color: var(--ink-2);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .hrow .htrack {
-        height: 14px;
+      .search {
         position: relative;
+        flex: 1 1 220px;
+        max-width: 340px;
       }
-      .hrow .hbar {
+      .search svg {
         position: absolute;
-        inset: 0 auto 0 0;
-        background: var(--series);
-        border-radius: 0 4px 4px 0;
-        min-width: 2px;
-      }
-      .hrow.hot .hbar {
-        background: var(--series-strong);
-      }
-      .hrow .hval {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--ink);
-        text-align: left;
-      }
-
-      /* ---- Tooltip ---- */
-      #tip {
-        position: fixed;
-        z-index: 50;
+        left: 10px;
+        top: 50%;
+        translate: 0 -50%;
+        width: 14px;
+        height: 14px;
+        stroke: var(--muted);
+        fill: none;
+        stroke-width: 2;
         pointer-events: none;
-        display: none;
+      }
+      .search input {
+        width: 100%;
+        font: inherit;
+        color: var(--ink);
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 8px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-        padding: 6px 10px;
-        max-width: 260px;
+        border-radius: 999px;
+        padding: 6px 14px 6px 30px;
       }
-      #tip .tip-v {
-        font-weight: 600;
-        font-size: 14px;
-        color: var(--ink);
-      }
-      #tip .tip-l {
-        font-size: 12px;
-        color: var(--ink-2);
+      .search input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
       }
 
-      /* ---- Browse ---- */
-      .browse {
-        margin-top: 12px;
-      }
-      .bhead {
+      .tabs {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-bottom: 10px;
-      }
-      .bhead h2 {
-        font-size: 16px;
-        margin: 0;
-      }
-      .controls {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-      .controls input,
-      .controls select {
-        font: inherit;
-        color: var(--ink);
-        background: var(--page);
+        gap: 2px;
+        background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 6px 10px;
+        border-radius: 999px;
+        padding: 2px;
       }
-      .controls input {
-        width: 260px;
-        max-width: 60vw;
+      .tabs button {
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink-2);
+        background: none;
+        border: none;
+        border-radius: 999px;
+        padding: 4px 12px;
+        cursor: pointer;
+        white-space: nowrap;
       }
+      .tabs button .n {
+        font-size: 11px;
+        color: var(--muted);
+        margin-left: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+      .tabs button[aria-pressed="true"] {
+        background: var(--ink);
+        color: var(--page);
+      }
+      .tabs button[aria-pressed="true"] .n {
+        color: color-mix(in srgb, var(--page) 70%, transparent);
+      }
+      .tabs button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+
+      .selwrap {
+        position: relative;
+        margin-left: auto;
+      }
+      .selwrap select {
+        appearance: none;
+        -webkit-appearance: none;
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink-2);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 28px 5px 12px;
+        cursor: pointer;
+      }
+      .selwrap select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .selwrap::after {
+        content: "";
+        position: absolute;
+        right: 13px;
+        top: 50%;
+        width: 6px;
+        height: 6px;
+        translate: 0 -70%;
+        rotate: 45deg;
+        border-right: 1.5px solid var(--muted);
+        border-bottom: 1.5px solid var(--muted);
+        pointer-events: none;
+      }
+
       .chip {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        margin-bottom: 8px;
-        background: color-mix(in srgb, var(--series) 12%, transparent);
-        border: 1px solid color-mix(in srgb, var(--series) 30%, transparent);
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
         border-radius: 999px;
-        padding: 2px 6px 2px 10px;
+        padding: 3px 6px 3px 12px;
         font-size: 13px;
       }
       .chip[hidden] {
@@ -356,109 +235,524 @@
         cursor: pointer;
         color: var(--ink-2);
         padding: 0 4px;
+        line-height: 1;
+      }
+
+      .countbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 10px 2px 12px;
       }
       #count {
         font-size: 12px;
         color: var(--muted);
-        margin-bottom: 8px;
+        font-variant-numeric: tabular-nums;
       }
-      #list {
+      .fixall {
+        font: inherit;
+        font-size: 12px;
+        color: var(--danger);
+        background: none;
+        border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+        border-radius: 999px;
+        padding: 3px 12px;
+        cursor: pointer;
+      }
+      .fixall:hover {
+        background: color-mix(in srgb, var(--danger) 8%, transparent);
+      }
+      .fixall.armed {
+        color: #fff;
+        background: var(--danger);
+        border-color: var(--danger);
+      }
+      .fixall[hidden] {
+        display: none;
+      }
+
+      /* ---- Masonry media grid ----
+         JS-managed columns (new cards go to the shortest column) so
+         "Load more" appends without reflowing existing cards. */
+      #grid {
         display: flex;
-        flex-direction: column;
-        gap: 10px;
+        align-items: flex-start;
+        gap: 14px;
       }
-      #list.loading {
+      #grid.loading {
         opacity: 0.5;
       }
-      .tweet {
-        border: 1px solid var(--grid);
-        border-radius: 10px;
-        padding: 12px 14px;
-      }
-      .tweet .thead {
+      #grid .gcol {
+        flex: 1 1 0;
+        min-width: 0;
         display: flex;
-        align-items: baseline;
-        gap: 8px;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 14px;
       }
-      .tweet .tname {
-        font-weight: 600;
+      #grid .empty {
+        flex: 1;
       }
-      .tweet .thandle {
-        color: var(--muted);
-        font-size: 13px;
+
+      .mcard {
+        position: relative;
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: none;
+        border-radius: 12px;
+        overflow: hidden;
         cursor: pointer;
+        background: var(--surface);
+        text-align: left;
+        font: inherit;
+        color: inherit;
+        box-shadow: 0 0 0 1px var(--border);
+        transition:
+          transform 0.18s ease,
+          box-shadow 0.18s ease;
       }
-      .tweet .thandle:hover {
-        color: var(--series);
+      .mcard:hover,
+      .mcard:focus-visible {
+        transform: translateY(-2px);
+        box-shadow:
+          0 0 0 1px var(--border),
+          0 10px 28px rgba(0, 0, 0, 0.16);
       }
-      .tweet .tdate {
+      .mcard:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .mcard,
+        .mcard:hover {
+          transition: none;
+          transform: none;
+        }
+      }
+
+      .thumb {
+        position: relative;
+        width: 100%;
+        display: block;
+        background: var(--grid);
+      }
+      .thumb img,
+      .thumb video {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .thumb.pending {
+        aspect-ratio: 4 / 3;
+        display: grid;
+        place-items: center;
+        background:
+          repeating-linear-gradient(
+            135deg,
+            transparent 0 10px,
+            color-mix(in srgb, var(--baseline) 24%, transparent) 10px 11px
+          ),
+          var(--surface);
         color: var(--muted);
         font-size: 12px;
+      }
+
+      .badges {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        display: flex;
+        gap: 6px;
+        z-index: 2;
+        pointer-events: none;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--badge-bg);
+        color: var(--badge-ink);
+        border-radius: 6px;
+        padding: 2px 7px;
+        font-size: 11px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        backdrop-filter: blur(4px);
+      }
+      .badge.right {
         margin-left: auto;
       }
-      .tweet .topen {
-        color: var(--series);
+      .badge svg {
+        width: 10px;
+        height: 10px;
+        fill: currentColor;
+      }
+
+      /* hover text reveal over the media */
+      .peek {
+        position: absolute;
+        inset: auto 0 0 0;
+        z-index: 2;
+        padding: 28px 12px 12px;
+        background: linear-gradient(180deg, transparent, var(--scrim));
+        opacity: 0;
+        translate: 0 6px;
+        transition:
+          opacity 0.18s ease,
+          translate 0.18s ease;
+        pointer-events: none;
+      }
+      /* Clamp lives on an inner, padding-free element — clamping the padded
+         box lets clipped lines bleed into the padding area. */
+      .peek .ptext {
+        color: #fff;
         font-size: 12px;
-        text-decoration: none;
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
       }
-      .tweet .topen:hover {
-        text-decoration: underline;
+      .mcard:hover .peek,
+      .mcard:focus-visible .peek {
+        opacity: 1;
+        translate: 0 0;
       }
-      .tweet .ttext {
-        margin: 6px 0 0;
-        white-space: pre-wrap;
-        word-break: break-word;
+      @media (prefers-reduced-motion: reduce) {
+        .peek {
+          transition: none;
+          translate: 0 0;
+        }
       }
-      .mediae {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-top: 10px;
-      }
-      .mediae img,
-      .mediae video {
-        max-width: 48%;
-        border-radius: 8px;
-        border: 1px solid var(--grid);
-      }
-      .mchip {
-        font-size: 12px;
-        color: var(--muted);
-        border: 1px dashed var(--baseline);
-        border-radius: 8px;
-        padding: 4px 8px;
-        align-self: flex-start;
-      }
-      .pager {
+
+      /* caption row below the media */
+      .meta {
         display: flex;
         align-items: center;
-        justify-content: center;
-        gap: 14px;
-        margin-top: 14px;
+        gap: 7px;
+        padding: 8px 10px;
       }
-      .pager button {
-        font: inherit;
-        color: var(--ink);
-        background: var(--page);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 5px 12px;
-        cursor: pointer;
+      .avatar {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: #fff;
+        flex: none;
       }
-      .pager button:disabled {
-        opacity: 0.4;
-        cursor: default;
-      }
-      .pager span {
-        font-size: 13px;
+      .meta .handle {
+        font-size: 12.5px;
+        font-weight: 600;
         color: var(--ink-2);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .meta .when {
+        margin-left: auto;
+        font-size: 11.5px;
+        color: var(--muted);
         font-variant-numeric: tabular-nums;
+        flex: none;
+      }
+
+      /* text-only bookmarks as quote cards */
+      .tcard .quote {
+        padding: 18px 16px 6px;
+        font-size: 14.5px;
+        line-height: 1.55;
+        color: var(--ink);
+        white-space: pre-wrap;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-line-clamp: 7;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .tcard .quote::before {
+        content: "";
+        display: block;
+        width: 22px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--accent);
+        margin-bottom: 12px;
+      }
+
+      .sentinel {
+        padding: 26px 0 6px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .sentinel[hidden] {
+        display: none;
       }
       .empty {
         color: var(--muted);
         text-align: center;
-        padding: 24px 0;
+        padding: 48px 0;
+      }
+
+      /* ---- Lightbox ---- */
+      #lb {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: var(--lightbox);
+        backdrop-filter: blur(8px);
+        padding: 20px;
+      }
+      #lb.open {
+        display: flex;
+      }
+      .lb-panel {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+        width: min(1280px, 100%);
+        /* Fixed height so media can size against it and fit unclipped. */
+        height: min(940px, 92vh);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      @media (max-width: 720px) {
+        .lb-panel {
+          grid-template-columns: 1fr;
+          overflow-y: auto;
+        }
+      }
+      .lb-media {
+        min-height: 280px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        overflow-y: auto;
+        background: var(--page);
+      }
+      .lb-media img,
+      .lb-media video {
+        /* Natural size, capped to the panel so nothing is clipped or upscaled. */
+        display: block;
+        flex: none;
+        width: auto;
+        height: auto;
+        max-width: 100%;
+        max-height: 100%;
+        margin: auto;
+      }
+      .lb-media .pending {
+        flex: 1;
+        align-self: stretch;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 13px;
+        min-height: 160px;
+      }
+      .lb-media .lb-quote {
+        margin: auto;
+        padding: 32px;
+        font-size: 19px;
+        line-height: 1.55;
+        max-width: 34ch;
+        color: var(--ink);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .lb-side {
+        padding: 20px 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow-y: auto;
+      }
+      .lb-author {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .lb-author .avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 13px;
+      }
+      .lb-author .who b {
+        display: block;
+        font-size: 14px;
+        line-height: 1.25;
+        cursor: pointer;
+      }
+      .lb-author .who b:hover {
+        color: var(--accent);
+      }
+      .lb-author .who span {
+        font-size: 12.5px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .lb-author .who span:hover {
+        color: var(--accent);
+      }
+      .lb-text {
+        margin: 0;
+        font-size: 14.5px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .lb-date {
+        align-self: flex-start;
+        font-size: 12.5px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        text-decoration: none;
+      }
+      .lb-date:hover {
+        color: var(--accent);
+        text-decoration: underline;
+      }
+      .lb-date:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+      .lb-actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-top: 12px;
+        border-top: 1px solid var(--grid);
+      }
+      .lb-actions a,
+      .lb-actions button {
+        font: inherit;
+        font-size: 13px;
+        text-decoration: none;
+        color: var(--ink-2);
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      .lb-actions a.primary {
+        color: #fff;
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .lb-actions[hidden],
+      .lb-actions button[hidden] {
+        display: none;
+      }
+      .lb-actions button.danger {
+        color: var(--danger);
+        border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+      }
+      .lb-actions button.danger:hover {
+        background: color-mix(in srgb, var(--danger) 10%, transparent);
+      }
+      .lb-actions .iconbtn {
+        margin-left: auto;
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border-radius: 8px;
+        color: var(--muted);
+      }
+      .lb-actions .iconbtn svg {
+        width: 15px;
+        height: 15px;
+      }
+      .lb-actions .iconbtn:hover {
+        color: var(--danger);
+        border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+        background: color-mix(in srgb, var(--danger) 8%, transparent);
+      }
+      .lb-confirm {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .lb-confirm .crow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lb-confirm .crow button {
+        flex: 1;
+        white-space: nowrap;
+      }
+      .lb-confirm .chead {
+        justify-content: space-between;
+      }
+      .lb-confirm .chead button {
+        flex: none;
+      }
+      .lb-confirm .cq {
+        font-size: 13px;
+        color: var(--ink-2);
+      }
+      .lb-confirm .quiet {
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .lb-confirm .quiet:hover {
+        color: var(--ink);
+      }
+      .lb-nav {
+        position: absolute;
+        top: 50%;
+        translate: 0 -50%;
+        z-index: 60;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 17px;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+      }
+      .lb-nav:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .lb-nav.prev {
+        left: 16px;
+      }
+      .lb-nav.next {
+        right: 16px;
+      }
+      .lb-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        z-index: 60;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 15px;
+        cursor: pointer;
       }
     </style>
   </head>
@@ -466,99 +760,117 @@
     <main>
       <header class="page">
         <h1>TBD Explorer</h1>
-        <p id="subtitle">Your X bookmarks archive</p>
+        <div class="statline" id="statline">Your X bookmarks archive</div>
       </header>
 
-      <section class="kpis" id="kpis"></section>
-
-      <div class="card chart-card" id="c-monthly">
-        <div class="chead">
-          <h3>Bookmarks per month</h3>
-          <button class="tbtn" aria-pressed="false">Table</button>
+      <div class="bar">
+        <div class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+          </svg>
+          <input
+            id="q"
+            type="search"
+            placeholder="Search text, name, or @handle"
+            aria-label="Search bookmarks"
+          />
         </div>
-        <p class="csub">By tweet date</p>
-        <div class="cbody"></div>
-        <div class="ctable" hidden></div>
+        <div
+          class="tabs"
+          role="group"
+          aria-label="Filter by media type"
+          id="tabs"
+        ></div>
+        <span class="selwrap">
+          <select id="sort" aria-label="Sort order">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </span>
       </div>
 
-      <div class="grid2">
-        <div class="card chart-card" id="c-hours">
-          <div class="chead">
-            <h3>By hour of day</h3>
-            <button class="tbtn" aria-pressed="false">Table</button>
-          </div>
-          <p class="csub">Local time of the bookmarked tweet</p>
-          <div class="cbody"></div>
-          <div class="ctable" hidden></div>
-        </div>
-        <div class="card chart-card" id="c-weekdays">
-          <div class="chead">
-            <h3>By day of week</h3>
-            <button class="tbtn" aria-pressed="false">Table</button>
-          </div>
-          <p class="csub">Local time of the bookmarked tweet</p>
-          <div class="cbody"></div>
-          <div class="ctable" hidden></div>
-        </div>
-      </div>
+      <span id="chip" class="chip" hidden>
+        <span></span
+        ><button title="Clear author filter" aria-label="Clear author filter">
+          ×
+        </button>
+      </span>
 
-      <div class="grid2">
-        <div class="card chart-card" id="c-authors">
-          <div class="chead">
-            <h3>Top authors</h3>
-            <button class="tbtn" aria-pressed="false">Table</button>
-          </div>
-          <p class="csub">Click an author to browse their bookmarks</p>
-          <div class="cbody"></div>
-          <div class="ctable" hidden></div>
-        </div>
-        <div class="card chart-card" id="c-media">
-          <div class="chead">
-            <h3>Media types</h3>
-            <button class="tbtn" aria-pressed="false">Table</button>
-          </div>
-          <p class="csub">All media records in the archive</p>
-          <div class="cbody"></div>
-          <div class="ctable" hidden></div>
-        </div>
-      </div>
-
-      <section class="card browse">
-        <div class="bhead">
-          <h2>Browse</h2>
-          <div class="controls">
-            <input
-              id="q"
-              type="search"
-              placeholder="Search text, name, or @handle"
-            />
-            <select id="sort">
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-            </select>
-          </div>
-        </div>
-        <div id="chip" class="chip" hidden>
-          <span></span><button title="Clear author filter">×</button>
-        </div>
+      <div class="countbar">
         <div id="count"></div>
-        <div id="list"></div>
-        <div class="pager">
-          <button id="prev">← Prev</button>
-          <span id="pageinfo"></span>
-          <button id="next">Next →</button>
-        </div>
-      </section>
+        <button class="fixall" id="fixall" hidden>Remove all</button>
+      </div>
+      <div id="grid"></div>
+      <div class="sentinel" id="more" hidden aria-hidden="true">
+        Loading more…
+      </div>
     </main>
-    <div id="tip">
-      <div class="tip-v"></div>
-      <div class="tip-l"></div>
+
+    <div id="lb" role="dialog" aria-modal="true" aria-label="Bookmark detail">
+      <button class="lb-close" id="lbclose" aria-label="Close">✕</button>
+      <button class="lb-nav prev" id="lbprev" aria-label="Previous">←</button>
+      <button class="lb-nav next" id="lbnext" aria-label="Next">→</button>
+      <div class="lb-panel">
+        <div class="lb-media" id="lbmedia"></div>
+        <div class="lb-side">
+          <div class="lb-author">
+            <span class="avatar" id="lbavatar"></span>
+            <span class="who">
+              <b id="lbname" title="Filter by this author"></b>
+              <span id="lbhandle" title="Filter by this author"></span>
+            </span>
+          </div>
+          <p class="lb-text" id="lbtext"></p>
+          <a
+            class="lb-date"
+            id="lbdate"
+            href="#"
+            target="_blank"
+            rel="noopener"
+            title="Open on X"
+          ></a>
+          <div class="lb-actions" id="lbactions">
+            <button id="lbfilter">More from this author</button>
+            <button id="lbreveal" hidden>Reveal in Finder</button>
+            <button
+              class="iconbtn"
+              id="lbremove"
+              title="Remove bookmark"
+              aria-label="Remove bookmark"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.5 7v4M9.5 7v4"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <div class="lb-actions lb-confirm" id="lbconfirm" hidden>
+            <div class="crow chead">
+              <span class="cq">Remove this bookmark?</span>
+              <button class="quiet" id="lbcancel">Cancel</button>
+            </div>
+            <div class="crow">
+              <button id="lbkeep">Just the bookmark</button>
+              <button class="danger" id="lbdelfiles">Also delete files</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
       "use strict";
       const $ = (sel, root) => (root || document).querySelector(sel);
-      const SVGNS = "http://www.w3.org/2000/svg";
+      const fmt = (n) => Number(n).toLocaleString("en-US");
 
       function el(tag, cls, text) {
         const n = document.createElement(tag);
@@ -566,785 +878,694 @@
         if (text != null) n.textContent = text;
         return n;
       }
-      function svgEl(tag, attrs) {
-        const n = document.createElementNS(SVGNS, tag);
-        for (const k in attrs) n.setAttribute(k, attrs[k]);
-        return n;
-      }
-      const fmt = (n) => Number(n).toLocaleString("en-US");
-      function niceCeil(v) {
-        if (v <= 0) return 1;
-        const p = Math.pow(10, Math.floor(Math.log10(v)));
-        for (const m of [1, 2, 5, 10]) if (m * p >= v) return m * p;
-        return 10 * p;
-      }
 
-      /* ---- Tooltip: value leads, label follows; textContent only ---- */
-      const tip = $("#tip");
-      function showTip(x, y, value, label) {
-        $(".tip-v", tip).textContent = value;
-        $(".tip-l", tip).textContent = label;
-        tip.style.display = "block";
-        const r = tip.getBoundingClientRect();
-        let left = x + 12,
-          top = y - r.height - 10;
-        if (left + r.width > innerWidth - 8) left = x - r.width - 12;
-        if (top < 8) top = y + 14;
-        tip.style.left = left + "px";
-        tip.style.top = top + "px";
-      }
-      function hideTip() {
-        tip.style.display = "none";
-      }
-
-      /* ---- Column chart: rounded data-end, square baseline, band-wide hit targets ---- */
-      function roundedTopRect(x, y, w, h, r) {
-        if (h <= 0) return "";
-        r = Math.min(r, w / 2, h);
-        return `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h} Z`;
-      }
-
-      function columnChart(container, data, opts = {}) {
-        container.textContent = "";
-        const W = Math.max(container.clientWidth, 220);
-        const H = opts.height || 190;
-        const padL = 38,
-          padR = 10,
-          padT = 18,
-          padB = 24;
-        const plotW = W - padL - padR,
-          plotH = H - padT - padB;
-        const max = niceCeil(Math.max(1, ...data.map((d) => d.value)));
-        const svg = svgEl("svg", {
-          width: W,
-          height: H,
-          viewBox: `0 0 ${W} ${H}`,
-          role: "img",
-        });
-
-        for (const v of [max / 2, max]) {
-          const y = padT + plotH * (1 - v / max);
-          svg.append(
-            svgEl("line", {
-              x1: padL,
-              x2: W - padR,
-              y1: y,
-              y2: y,
-              class: "grid-line",
-            }),
-          );
-          const t = svgEl("text", {
-            x: padL - 6,
-            y: y + 3.5,
-            class: "tick",
-            "text-anchor": "end",
-          });
-          t.textContent = fmt(v);
-          svg.append(t);
-        }
-        const baseY = padT + plotH;
-        svg.append(
-          svgEl("line", {
-            x1: padL,
-            x2: W - padR,
-            y1: baseY,
-            y2: baseY,
-            class: "baseline-line",
-          }),
-        );
-        const zt = svgEl("text", {
-          x: padL - 6,
-          y: baseY + 3.5,
-          class: "tick",
-          "text-anchor": "end",
-        });
-        zt.textContent = "0";
-        svg.append(zt);
-
-        const n = data.length;
-        const band = plotW / n;
-        const barW = Math.min(24, Math.max(2, band - 2));
-        const peak = data.reduce(
-          (b, d, i) => (d.value > data[b].value ? i : b),
-          0,
-        );
-
-        data.forEach((d, i) => {
-          const h = plotH * (d.value / max);
-          const x = padL + band * i + (band - barW) / 2;
-          const y = baseY - h;
-          const bar = svgEl("path", {
-            d: roundedTopRect(x, y, barW, h, 4),
-            class: "bar",
-          });
-          svg.append(bar);
-
-          if (opts.showXLabel && opts.showXLabel(d, i)) {
-            const t = svgEl("text", {
-              x: padL + band * i + band / 2,
-              y: H - 8,
-              class: "xlab",
-              "text-anchor": "middle",
-            });
-            t.textContent = d.label;
-            svg.append(t);
-          }
-
-          const hit = svgEl("rect", {
-            x: padL + band * i,
-            y: padT,
-            width: band,
-            height: plotH,
-            class: "hit",
-            tabindex: 0,
-          });
-          const on = (cx, cy) => {
-            bar.classList.add("hot");
-            showTip(
-              cx,
-              cy,
-              fmt(d.value) + (opts.unit || ""),
-              d.tipLabel || d.label,
-            );
-          };
-          const off = () => {
-            bar.classList.remove("hot");
-            hideTip();
-          };
-          hit.addEventListener("pointermove", (e) => on(e.clientX, e.clientY));
-          hit.addEventListener("pointerleave", off);
-          hit.addEventListener("focus", () => {
-            const r = hit.getBoundingClientRect();
-            on(r.left + r.width / 2, r.top);
-          });
-          hit.addEventListener("blur", off);
-          svg.append(hit);
-        });
-
-        // Selective direct label: the peak only.
-        if (data[peak] && data[peak].value > 0) {
-          const h = plotH * (data[peak].value / max);
-          const t = svgEl("text", {
-            x: padL + band * peak + band / 2,
-            y: baseY - h - 5,
-            class: "dlabel",
-            "text-anchor": "middle",
-          });
-          t.textContent = fmt(data[peak].value);
-          svg.append(t);
-        }
-
-        container.append(svg);
-      }
-
-      /* ---- Line + area chart with crosshair tooltip ---- */
-      function lineChart(container, data, opts = {}) {
-        container.textContent = "";
-        const W = Math.max(container.clientWidth, 220);
-        const H = opts.height || 230;
-        const padL = 38,
-          padR = 16,
-          padT = 18,
-          padB = 26;
-        const plotW = W - padL - padR,
-          plotH = H - padT - padB;
-        const max = niceCeil(Math.max(1, ...data.map((d) => d.value)));
-        const svg = svgEl("svg", {
-          width: W,
-          height: H,
-          viewBox: `0 0 ${W} ${H}`,
-          role: "img",
-        });
-        const baseY = padT + plotH;
-
-        for (const v of [max / 2, max]) {
-          const y = padT + plotH * (1 - v / max);
-          svg.append(
-            svgEl("line", {
-              x1: padL,
-              x2: W - padR,
-              y1: y,
-              y2: y,
-              class: "grid-line",
-            }),
-          );
-          const t = svgEl("text", {
-            x: padL - 6,
-            y: y + 3.5,
-            class: "tick",
-            "text-anchor": "end",
-          });
-          t.textContent = fmt(v);
-          svg.append(t);
-        }
-        svg.append(
-          svgEl("line", {
-            x1: padL,
-            x2: W - padR,
-            y1: baseY,
-            y2: baseY,
-            class: "baseline-line",
-          }),
-        );
-        const zt = svgEl("text", {
-          x: padL - 6,
-          y: baseY + 3.5,
-          class: "tick",
-          "text-anchor": "end",
-        });
-        zt.textContent = "0";
-        svg.append(zt);
-
-        const n = data.length;
-        const pts = data.map((d, i) => ({
-          x: padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1)),
-          y: padT + plotH * (1 - d.value / max),
-        }));
-
-        if (n > 1) {
-          const lineD = pts
-            .map((p, i) => (i ? "L" : "M") + p.x + "," + p.y)
-            .join(" ");
-          svg.append(
-            svgEl("path", {
-              d: `${lineD} L${pts[n - 1].x},${baseY} L${pts[0].x},${baseY} Z`,
-              class: "area-mark",
-            }),
-          );
-          svg.append(svgEl("path", { d: lineD, class: "line-mark" }));
-        }
-        if (n <= 36) {
-          for (const p of pts)
-            svg.append(
-              svgEl("circle", { cx: p.x, cy: p.y, r: 4, class: "dot" }),
-            );
-        }
-
-        // X labels: about six, evenly spaced; skip the one before the endpoint so the
-        // end-anchored final label never collides or clips at the right edge.
-        const step = Math.max(1, Math.ceil(n / 6));
-        data.forEach((d, i) => {
-          const isLast = i === n - 1;
-          if (!isLast && (i % step !== 0 || n - 1 - i < step / 2)) return;
-          const t = svgEl("text", {
-            x: pts[i].x,
-            y: H - 8,
-            class: "xlab",
-            "text-anchor": isLast ? "end" : i === 0 ? "start" : "middle",
-          });
-          t.textContent = d.label;
-          svg.append(t);
-        });
-
-        // Direct label on the endpoint.
-        if (n > 0) {
-          const lastPt = pts[n - 1];
-          const t = svgEl("text", {
-            x: lastPt.x,
-            y: Math.max(padT + 4, lastPt.y - 8),
-            class: "dlabel",
-            "text-anchor": "end",
-          });
-          t.textContent = fmt(data[n - 1].value);
-          svg.append(t);
-        }
-
-        // Crosshair finds the X.
-        const cross = svgEl("line", {
-          x1: 0,
-          x2: 0,
-          y1: padT,
-          y2: baseY,
-          class: "cross",
-          visibility: "hidden",
-        });
-        const hoverDot = svgEl("circle", {
-          r: 5,
-          class: "dot",
-          visibility: "hidden",
-        });
-        svg.append(cross, hoverDot);
-        const overlay = svgEl("rect", {
-          x: padL,
-          y: padT,
-          width: plotW,
-          height: plotH,
-          class: "hit",
-        });
-        overlay.addEventListener("pointermove", (e) => {
-          const rect = svg.getBoundingClientRect();
-          const mx = e.clientX - rect.left;
-          let best = 0;
-          for (let i = 1; i < n; i++)
-            if (Math.abs(pts[i].x - mx) < Math.abs(pts[best].x - mx)) best = i;
-          cross.setAttribute("x1", pts[best].x);
-          cross.setAttribute("x2", pts[best].x);
-          cross.setAttribute("visibility", "visible");
-          hoverDot.setAttribute("cx", pts[best].x);
-          hoverDot.setAttribute("cy", pts[best].y);
-          hoverDot.setAttribute("visibility", "visible");
-          showTip(
-            e.clientX,
-            e.clientY,
-            fmt(data[best].value) + " bookmarks",
-            data[best].tipLabel || data[best].label,
-          );
-        });
-        overlay.addEventListener("pointerleave", () => {
-          cross.setAttribute("visibility", "hidden");
-          hoverDot.setAttribute("visibility", "hidden");
-          hideTip();
-        });
-        svg.append(overlay);
-
-        container.append(svg);
-      }
-
-      /* ---- Horizontal bars (HTML rows) ---- */
-      function hBarChart(container, data, opts = {}) {
-        container.textContent = "";
-        const max = Math.max(1, ...data.map((d) => d.value));
-        for (const d of data) {
-          const row = el("div", "hrow" + (opts.onClick ? " clickable" : ""));
-          row.append(el("span", "hlabel", d.label));
-          const track = el("div", "htrack");
-          const bar = el("div", "hbar");
-          bar.style.width = (100 * d.value) / max + "%";
-          track.append(bar);
-          row.append(track);
-          row.append(el("span", "hval", fmt(d.value)));
-          row.addEventListener("pointermove", (e) => {
-            row.classList.add("hot");
-            showTip(
-              e.clientX,
-              e.clientY,
-              fmt(d.value) + (opts.unit || ""),
-              d.tipLabel || d.label,
-            );
-          });
-          row.addEventListener("pointerleave", () => {
-            row.classList.remove("hot");
-            hideTip();
-          });
-          if (opts.onClick) {
-            row.tabIndex = 0;
-            row.setAttribute("role", "button");
-            row.addEventListener("click", () => opts.onClick(d));
-            row.addEventListener("keydown", (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                opts.onClick(d);
-              }
-            });
-          }
-          container.append(row);
-        }
-      }
-
-      /* ---- Table twin for every chart ---- */
-      function renderTable(container, headers, rows) {
-        container.textContent = "";
-        const table = el("table");
-        const trh = el("tr");
-        headers.forEach((h, i) => trh.append(el("th", i > 0 ? "num" : "", h)));
-        table.append(trh);
-        for (const r of rows) {
-          const tr = el("tr");
-          r.forEach((c, i) =>
-            tr.append(
-              el("td", i > 0 ? "num" : "", typeof c === "number" ? fmt(c) : c),
-            ),
-          );
-          table.append(tr);
-        }
-        container.append(table);
-      }
-
-      /* ---- Chart card wiring (chart/table toggle + resize re-render) ---- */
-      const cards = [];
-      function mountCard(id, render, tableHeaders, tableRows) {
-        const card = $("#" + id);
-        const body = $(".cbody", card);
-        const tableEl = $(".ctable", card);
-        const btn = $(".tbtn", card);
-        btn.addEventListener("click", () => {
-          const showTable = btn.getAttribute("aria-pressed") !== "true";
-          btn.setAttribute("aria-pressed", String(showTable));
-          btn.textContent = showTable ? "Chart" : "Table";
-          body.hidden = showTable;
-          tableEl.hidden = !showTable;
-        });
-        renderTable(tableEl, tableHeaders, tableRows);
-        const doRender = () => {
-          if (!body.hidden) render(body);
-        };
-        doRender();
-        cards.push(doRender);
-      }
-      let resizeTimer = null;
-      addEventListener("resize", () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => cards.forEach((fn) => fn()), 150);
-      });
-
-      /* ---- Formatting helpers ---- */
-      const MONTHS = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      function monthLabel(ym) {
-        const [y, m] = ym.split("-").map(Number);
-        return MONTHS[m - 1] + " ’" + String(y).slice(2);
-      }
-      function monthFull(ym) {
-        const [y, m] = ym.split("-").map(Number);
-        return MONTHS[m - 1] + " " + y;
-      }
       const TYPE_LABELS = {
-        photo: "Photos",
-        video: "Videos",
-        animated_gif: "GIFs",
+        photo: "photo",
+        video: "video",
+        animated_gif: "GIF",
       };
+      const KIND_TABS = [
+        ["all", "All"],
+        ["photo", "Photos"],
+        ["video", "Videos"],
+        ["gif", "GIFs"],
+        ["text", "Text"],
+        ["missing", "Missing"],
+      ];
 
-      /* ---- Stats section ---- */
-      function tile(label, value, sub) {
-        const t = el("div", "card tile");
-        t.append(el("div", "tlabel", label));
-        t.append(el("div", "tvalue", value));
-        if (sub) t.append(el("div", "tsub", sub));
-        return t;
-      }
+      /* ---- State ---- */
+      const state = {
+        q: "",
+        type: "all",
+        author: "",
+        sort: "newest",
+        page: 1,
+        total: 0,
+        counts: null,
+        items: [],
+      };
+      let fetchController = null;
 
+      /* ---- Header stats: one quiet line ---- */
       async function loadStats() {
         const res = await fetch("/api/explore/stats");
         if (!res.ok) throw new Error("stats request failed");
         const stats = await res.json();
-
+        const line = $("#statline");
+        line.textContent = "";
+        const add = (value, label) => {
+          if (line.children.length) line.append(el("span", "dot", "·"));
+          const b = el("b", "", value);
+          line.append(b, " " + label);
+        };
+        add(fmt(stats.totals.bookmarks), "bookmarks");
+        add(
+          fmt(stats.totals.media_downloaded) +
+            " / " +
+            fmt(stats.totals.media_total),
+          "media files",
+        );
+        add(fmt(stats.totals.authors), "authors");
         if (stats.first_bookmark) {
-          const first = new Date(stats.first_bookmark);
-          const last = new Date(stats.last_bookmark);
           const opt = { year: "numeric", month: "short" };
-          $("#subtitle").textContent =
-            "Your X bookmarks archive · " +
-            first.toLocaleDateString(undefined, opt) +
-            " – " +
-            last.toLocaleDateString(undefined, opt);
+          line.append(
+            el("span", "dot", "·"),
+            new Date(stats.first_bookmark).toLocaleDateString(undefined, opt) +
+              " – " +
+              new Date(stats.last_bookmark).toLocaleDateString(undefined, opt),
+          );
+        }
+      }
+
+      /* ---- Tabs with live counts ---- */
+      function renderTabs() {
+        const tabs = $("#tabs");
+        tabs.textContent = "";
+        for (const [key, label] of KIND_TABS) {
+          const b = el("button");
+          b.setAttribute("aria-pressed", String(state.type === key));
+          b.append(label);
+          if (state.counts && state.counts[key] != null)
+            b.append(el("span", "n", fmt(state.counts[key])));
+          b.addEventListener("click", () => {
+            if (state.type === key) return;
+            state.type = key;
+            resetAndLoad();
+          });
+          tabs.append(b);
+        }
+      }
+
+      /* ---- Icons / avatar ---- */
+      const svgNS = "http://www.w3.org/2000/svg";
+      function icon(kind) {
+        const s = document.createElementNS(svgNS, "svg");
+        s.setAttribute("viewBox", "0 0 12 12");
+        const p = document.createElementNS(svgNS, "path");
+        if (kind === "play")
+          p.setAttribute("d", "M2.5 1.5 L10.5 6 L2.5 10.5 Z");
+        if (kind === "stack")
+          p.setAttribute("d", "M1 4 h7 v7 h-7 Z M4 1 h7 v7 h-2 V4 H4 Z");
+        s.append(p);
+        return s;
+      }
+
+      function hueFor(handle) {
+        let h = 0;
+        for (const c of handle.toLowerCase())
+          h = (h * 31 + c.charCodeAt(0)) % 360;
+        return h;
+      }
+      // First grapheme of the name — indexing with [0] splits emoji into a
+      // lone surrogate (�). Prefer the first letter/digit so "🔥 Jo" → "J";
+      // an all-emoji name shows the emoji itself.
+      function avatarChar(str) {
+        const graphemes =
+          typeof Intl !== "undefined" && Intl.Segmenter
+            ? Array.from(new Intl.Segmenter().segment(str), (s) => s.segment)
+            : Array.from(str);
+        const letter = graphemes.find((g) => /\p{L}|\p{N}/u.test(g));
+        return (letter || graphemes[0] || "?").toUpperCase();
+      }
+      function avatarEl(t) {
+        const a = el("span", "avatar");
+        const handle = t.screen_name || "?";
+        a.style.background = `hsl(${hueFor(handle)} 45% 45%)`;
+        a.textContent = avatarChar(t.name || handle);
+        return a;
+      }
+
+      const fmtDate = (d) =>
+        new Date(d).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      const shortDate = (d) =>
+        new Date(d).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+        });
+
+      /* ---- Media helpers ---- */
+      const mediaSrc = (m) => "/media/" + encodeURIComponent(m.file);
+      const isMotion = (m) => m.type === "video" || m.type === "animated_gif";
+
+      function badgeEl(t) {
+        const wrap = el("div", "badges");
+        const kinds = new Set(t.media.map((m) => m.type));
+        if (kinds.has("video")) {
+          const b = el("span", "badge");
+          b.append(icon("play"));
+          wrap.append(b);
+        } else if (kinds.has("animated_gif")) {
+          wrap.append(el("span", "badge", "GIF"));
+        }
+        if (t.media.length > 1) {
+          const b = el("span", "badge right");
+          b.append(icon("stack"), " " + t.media.length);
+          wrap.append(b);
+        }
+        return wrap;
+      }
+
+      /* ---- Masonry columns ---- */
+      let cols = [];
+      let cardNodes = [];
+      function colCount() {
+        const w = $("#grid").clientWidth;
+        return Math.max(1, Math.min(4, Math.floor((w + 14) / (240 + 14))));
+      }
+      function setupColumns() {
+        const grid = $("#grid");
+        grid.textContent = "";
+        cols = [];
+        for (let i = 0; i < colCount(); i++) {
+          const c = el("div", "gcol");
+          grid.append(c);
+          cols.push(c);
+        }
+      }
+      function placeCard(node) {
+        let best = cols[0];
+        for (const c of cols) if (c.offsetHeight < best.offsetHeight) best = c;
+        best.append(node);
+      }
+      let resizeTimer = null;
+      addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (!cardNodes.length || cols.length === colCount()) return;
+          setupColumns();
+          cardNodes.forEach(placeCard);
+        }, 150);
+      });
+
+      /* ---- Cards ---- */
+      function card(t) {
+        const hasMedia = t.media && t.media.length > 0;
+        const c = el("button", "mcard" + (hasMedia ? "" : " tcard"));
+        // Look the index up at click time — deletions splice state.items.
+        c.addEventListener("click", () => openLb(state.items.indexOf(t)));
+
+        if (!hasMedia) {
+          c.append(el("div", "quote", t.full_text || "(no text)"));
+        } else {
+          const lead = t.media.find((m) => m.file && !m.missing) || t.media[0];
+          const thumb = el("div", "thumb");
+          // Reserve the real aspect ratio up front so masonry placement and
+          // infinite-scroll measurements are correct before the file loads.
+          if (lead.width && lead.height)
+            thumb.style.aspectRatio = lead.width + " / " + lead.height;
+          if (lead.file && !lead.missing) {
+            if (isMotion(lead)) {
+              const v = document.createElement("video");
+              v.src = mediaSrc(lead);
+              v.muted = true;
+              v.loop = true;
+              v.playsInline = true;
+              v.preload = "metadata";
+              c.addEventListener("mouseenter", () => {
+                v.play().catch(() => {});
+              });
+              c.addEventListener("mouseleave", () => {
+                v.pause();
+              });
+              thumb.append(v);
+            } else {
+              const img = document.createElement("img");
+              img.src = mediaSrc(lead);
+              img.loading = "lazy";
+              img.alt = "";
+              thumb.append(img);
+            }
+          } else {
+            thumb.classList.add("pending");
+            thumb.append(
+              (TYPE_LABELS[lead.type] || lead.type) +
+                (lead.missing ? " · file missing" : " · not downloaded"),
+            );
+          }
+          thumb.append(badgeEl(t));
+          if (t.full_text) {
+            const peek = el("div", "peek");
+            peek.append(el("div", "ptext", t.full_text));
+            thumb.append(peek);
+          }
+          c.append(thumb);
         }
 
-        const kpis = $("#kpis");
-        kpis.textContent = "";
-        const monthly = stats.monthly || [];
-        const thisMonth = monthly.length
-          ? monthly[monthly.length - 1].count
-          : 0;
-        kpis.append(
-          tile(
-            "Bookmarks",
-            fmt(stats.totals.bookmarks),
-            "+" + fmt(thisMonth) + " this month",
-          ),
-        );
-        kpis.append(tile("Authors", fmt(stats.totals.authors)));
-        const withMediaPct = stats.totals.bookmarks
-          ? Math.round(
-              (100 * stats.totals.tweets_with_media) / stats.totals.bookmarks,
-            )
-          : 0;
-        kpis.append(
-          tile(
-            "With media",
-            fmt(stats.totals.tweets_with_media),
-            withMediaPct + "% of bookmarks",
-          ),
-        );
-        kpis.append(
-          tile(
-            "Media files",
-            fmt(stats.totals.media_downloaded) +
-              " / " +
-              fmt(stats.totals.media_total),
-            stats.totals.media_failed > 0
-              ? fmt(stats.totals.media_failed) + " failed"
-              : "downloaded",
-          ),
-        );
+        const meta = el("div", "meta");
+        meta.append(avatarEl(t));
+        meta.append(el("span", "handle", "@" + (t.screen_name || "unknown")));
+        meta.append(el("span", "when", shortDate(t.created_at)));
+        c.append(meta);
 
-        const monthData = monthly.map((m) => ({
-          label: monthLabel(m.month),
-          tipLabel: monthFull(m.month),
-          value: m.count,
-        }));
-        mountCard(
-          "c-monthly",
-          (body) => lineChart(body, monthData, { height: 230 }),
-          ["Month", "Bookmarks"],
-          monthly.map((m) => [monthFull(m.month), m.count]),
-        );
-
-        const hourData = (stats.hours || []).map((v, h) => ({
-          label: String(h),
-          tipLabel:
-            String(h).padStart(2, "0") +
-            ":00 – " +
-            String(h).padStart(2, "0") +
-            ":59",
-          value: v,
-        }));
-        mountCard(
-          "c-hours",
-          (body) =>
-            columnChart(body, hourData, {
-              showXLabel: (d, i) => i % 6 === 0 || i === 23,
-            }),
-          ["Hour", "Bookmarks"],
-          hourData.map((d) => [d.tipLabel, d.value]),
-        );
-
-        const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-        const wdData = (stats.weekdays || []).map((v, i) => ({
-          label: WEEKDAYS[i],
-          value: v,
-        }));
-        mountCard(
-          "c-weekdays",
-          (body) => columnChart(body, wdData, { showXLabel: () => true }),
-          ["Day", "Bookmarks"],
-          wdData.map((d) => [d.label, d.value]),
-        );
-
-        const authorData = (stats.top_authors || []).map((a) => ({
-          label: "@" + a.screen_name,
-          tipLabel: (a.name || a.screen_name) + " · @" + a.screen_name,
-          value: a.count,
-          screenName: a.screen_name,
-        }));
-        mountCard(
-          "c-authors",
-          (body) =>
-            hBarChart(body, authorData, {
-              unit: " bookmarks",
-              onClick: (d) => setAuthorFilter(d.screenName),
-            }),
-          ["Author", "Bookmarks"],
-          authorData.map((d) => [d.label, d.value]),
-        );
-
-        const mediaData = (stats.media_types || []).map((mt) => ({
-          label: TYPE_LABELS[mt.type] || mt.type,
-          value: mt.count,
-        }));
-        mountCard(
-          "c-media",
-          (body) => {
-            if (mediaData.length) hBarChart(body, mediaData);
-            else body.append(el("div", "empty", "No media yet"));
-          },
-          ["Type", "Files"],
-          mediaData.map((d) => [d.label, d.value]),
-        );
+        return c;
       }
 
-      /* ---- Browse ---- */
-      const state = {
-        q: "",
-        author: "",
-        sort: "newest",
-        page: 1,
-        totalPages: 1,
-      };
-      let fetchController = null;
+      /* ---- Fetch + render ---- */
+      function params() {
+        const p = new URLSearchParams();
+        if (state.q) p.set("q", state.q);
+        if (state.author) p.set("author", state.author);
+        if (state.type !== "all") p.set("type", state.type);
+        if (state.sort !== "newest") p.set("sort", state.sort);
+        p.set("page", String(state.page));
+        return p;
+      }
 
-      function setAuthorFilter(screenName) {
-        state.author = screenName;
-        state.page = 1;
+      async function fetchInto(url, emptyMessage) {
+        const grid = $("#grid");
+        if (fetchController) fetchController.abort();
+        fetchController = new AbortController();
+        try {
+          const res = await fetch(url, { signal: fetchController.signal });
+          if (!res.ok) throw new Error("request failed");
+          return await res.json();
+        } catch (err) {
+          if (err.name === "AbortError") return null;
+          grid.classList.remove("loading");
+          grid.textContent = "";
+          grid.append(el("div", "empty", emptyMessage));
+          $("#more").hidden = true;
+          return null;
+        }
+      }
+
+      function appendCards(tweets) {
+        tweets.forEach((t) => {
+          const node = card(t);
+          cardNodes.push(node);
+          placeCard(node);
+        });
+      }
+
+      function updateCount() {
+        $("#count").textContent =
+          fmt(state.total) + (state.total === 1 ? " bookmark" : " bookmarks");
+      }
+
+      async function loadPage(append) {
+        if (state.type === "missing") return loadMissing();
+        resetFixAll(true);
+        const grid = $("#grid");
+        if (!append) grid.classList.add("loading");
+
+        const data = await fetchInto(
+          "/api/explore/tweets?" + params(),
+          "Could not load bookmarks — is the local app running?",
+        );
+        if (!data) return;
+
+        state.total = data.total;
+        const missingCount = state.counts ? state.counts.missing : null;
+        state.counts = data.counts || null;
+        if (state.counts && missingCount != null)
+          state.counts.missing = missingCount;
+        if (!append) {
+          state.items = [];
+          cardNodes = [];
+          setupColumns();
+        }
+        state.items.push(...data.items);
+        appendCards(data.items);
+
+        if (!state.items.length) {
+          grid.textContent = "";
+          grid.append(el("div", "empty", "No bookmarks match."));
+        }
+        updateCount();
+        $("#more").hidden = state.items.length >= data.total;
+        renderTabs();
         updateChip();
-        loadTweets();
-        $(".browse").scrollIntoView({ behavior: "smooth" });
+        grid.classList.remove("loading");
+        // A short result may leave the sentinel still in view — keep filling.
+        maybeLoadMore();
       }
+
+      async function loadMissing() {
+        const grid = $("#grid");
+        grid.classList.add("loading");
+        $("#more").hidden = true;
+        resetFixAll(true);
+
+        const data = await fetchInto(
+          "/api/explore/missing",
+          "Could not check for missing files — is the local app running?",
+        );
+        if (!data) return;
+
+        state.total = data.total;
+        if (!state.counts) state.counts = {};
+        state.counts.missing = data.total;
+        state.items = data.items;
+        cardNodes = [];
+        setupColumns();
+        appendCards(data.items);
+
+        if (!state.items.length) {
+          grid.textContent = "";
+          grid.append(
+            el(
+              "div",
+              "empty",
+              "No missing files — every downloaded media file is on disk.",
+            ),
+          );
+        }
+        updateCount();
+        resetFixAll(!state.items.length);
+        renderTabs();
+        updateChip();
+        grid.classList.remove("loading");
+      }
+
+      /* ---- Remove all missing bookmarks (two-click confirm) ---- */
+      let fixArmTimer = null;
+      function resetFixAll(hide) {
+        const btn = $("#fixall");
+        clearTimeout(fixArmTimer);
+        fixArmTimer = null;
+        btn.classList.remove("armed");
+        btn.disabled = false;
+        btn.textContent = "Remove all " + fmt(state.total);
+        btn.hidden = hide;
+      }
+      $("#fixall").addEventListener("click", async () => {
+        const btn = $("#fixall");
+        if (!fixArmTimer) {
+          btn.classList.add("armed");
+          btn.textContent = "Click again to confirm";
+          fixArmTimer = setTimeout(() => resetFixAll(false), 4000);
+          return;
+        }
+        clearTimeout(fixArmTimer);
+        fixArmTimer = null;
+        btn.disabled = true;
+        let res;
+        try {
+          res = await fetch("/api/explore/missing/fix", { method: "POST" });
+        } catch {
+          res = null;
+        }
+        if (!res || !res.ok) {
+          alert("Failed to remove bookmarks — is the local app running?");
+          resetFixAll(false);
+          return;
+        }
+        if (state.counts) state.counts.missing = 0;
+        resetAndLoad(); // re-fetches the Missing tab → empty state
+      });
+
+      /* ---- Infinite loading ---- */
+      let loadingMore = false;
+      let loadGen = 0; // bumped on every filter reset to cancel stale appends
+      function sentinelNear() {
+        const s = $("#more");
+        return !s.hidden && s.getBoundingClientRect().top < innerHeight + 600;
+      }
+      async function maybeLoadMore() {
+        if (loadingMore || !sentinelNear()) return;
+        const gen = loadGen;
+        loadingMore = true;
+        state.page++;
+        await loadPage(true);
+        loadingMore = false;
+        // Keep filling until the sentinel leaves the viewport margin;
+        // a reset mid-flight owns the next fill instead.
+        if (gen === loadGen) maybeLoadMore();
+      }
+      new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) maybeLoadMore();
+        },
+        { rootMargin: "600px 0px" },
+      ).observe($("#more"));
+
+      // Mirror the active filters into the URL so views are shareable and
+      // survive a reload; defaults are omitted to keep the URL clean.
+      function syncURL() {
+        const p = new URLSearchParams();
+        if (state.q) p.set("q", state.q);
+        if (state.type !== "all") p.set("type", state.type);
+        if (state.author) p.set("author", state.author);
+        if (state.sort !== "newest") p.set("sort", state.sort);
+        const qs = p.toString();
+        history.replaceState(null, "", qs ? "?" + qs : location.pathname);
+      }
+
+      function resetAndLoad() {
+        loadGen++;
+        state.page = 1;
+        syncURL();
+        loadPage(false);
+      }
+
       function updateChip() {
         const chip = $("#chip");
         chip.hidden = !state.author;
         if (state.author) $("span", chip).textContent = "@" + state.author;
       }
-      $("#chip button").addEventListener("click", () => {
-        state.author = "";
-        state.page = 1;
-        updateChip();
-        loadTweets();
+
+      /* ---- Lightbox ---- */
+      let lbIndex = 0;
+      function openLb(i) {
+        lbIndex = i;
+        fillLb();
+        $("#lb").classList.add("open");
+        document.body.style.overflow = "hidden";
+      }
+      function closeLb() {
+        $("#lb").classList.remove("open");
+        document.body.style.overflow = "";
+        $("#lbmedia").textContent = ""; // stop any playing video
+      }
+      function fillLb() {
+        const t = state.items[lbIndex];
+        if (!t) return;
+        const m = $("#lbmedia");
+        m.textContent = "";
+        const media = t.media || [];
+        let firstVideo = null;
+        if (!media.length) {
+          m.append(el("div", "lb-quote", t.full_text || "(no text)"));
+        } else {
+          for (const item of media) {
+            if (!item.file || item.missing) {
+              m.append(
+                el(
+                  "div",
+                  "pending",
+                  (TYPE_LABELS[item.type] || item.type) +
+                    (item.missing ? " · file missing" : " · not downloaded"),
+                ),
+              );
+              continue;
+            }
+            if (isMotion(item)) {
+              const v = document.createElement("video");
+              v.src = mediaSrc(item);
+              v.preload = "metadata";
+              v.playsInline = true;
+              if (item.type === "animated_gif") {
+                v.muted = true;
+                v.loop = true;
+                v.autoplay = true;
+              } else {
+                v.controls = true;
+                if (!firstVideo) firstVideo = v;
+              }
+              m.append(v);
+            } else {
+              const img = document.createElement("img");
+              img.src = mediaSrc(item);
+              img.alt = "";
+              m.append(img);
+            }
+          }
+        }
+        // Opening/navigating is a user gesture, so play-with-sound is allowed;
+        // if the browser still blocks it, retry muted.
+        if (firstVideo) {
+          firstVideo.play().catch(() => {
+            firstVideo.muted = true;
+            firstVideo.play().catch(() => {});
+          });
+        }
+        const av = avatarEl(t);
+        av.id = "lbavatar";
+        $("#lbavatar").replaceWith(av);
+        $("#lbname").textContent = t.name || t.screen_name || "unknown";
+        $("#lbhandle").textContent = "@" + (t.screen_name || "unknown");
+        $("#lbfilter").hidden = !t.screen_name;
+        if (t.screen_name)
+          $("#lbfilter").textContent = "More from @" + t.screen_name;
+        $("#lbtext").textContent = t.full_text || "";
+        $("#lbdate").textContent = fmtDate(t.created_at) + " ↗";
+        $("#lbdate").href = t.permanent_url || "#";
+        $("#lbreveal").hidden = !(t.media || []).some(
+          (item) => item.file && !item.missing,
+        );
+        hideConfirm();
+        $("#lbprev").disabled = lbIndex <= 0;
+        $("#lbnext").disabled = lbIndex >= state.items.length - 1;
+      }
+      $("#lbclose").addEventListener("click", closeLb);
+      $("#lb").addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) closeLb();
+      });
+      $("#lbprev").addEventListener("click", () => {
+        if (lbIndex > 0) {
+          lbIndex--;
+          fillLb();
+        }
+      });
+      $("#lbnext").addEventListener("click", () => {
+        if (lbIndex < state.items.length - 1) {
+          lbIndex++;
+          fillLb();
+        }
+      });
+      addEventListener("keydown", (e) => {
+        if (!$("#lb").classList.contains("open")) return;
+        if (e.key === "Escape") closeLb();
+        if (e.key === "ArrowLeft") $("#lbprev").click();
+        if (e.key === "ArrowRight") $("#lbnext").click();
+      });
+      function filterAuthor(handle) {
+        state.author = handle;
+        closeLb();
+        resetAndLoad();
+        scrollTo({ top: 0, behavior: "smooth" });
+      }
+      for (const sel of ["#lbname", "#lbhandle"]) {
+        $(sel).addEventListener("click", () => {
+          const t = state.items[lbIndex];
+          if (t && t.screen_name) filterAuthor(t.screen_name);
+        });
+      }
+      $("#lbfilter").addEventListener("click", () => {
+        const t = state.items[lbIndex];
+        if (t && t.screen_name) filterAuthor(t.screen_name);
       });
 
+      /* ---- Remove bookmark (optionally with its files) ---- */
+      function decrementCounts(t) {
+        const c = state.counts;
+        if (!c) return;
+        const dec = (key) => {
+          if (c[key] != null && c[key] > 0) c[key]--;
+        };
+        dec("all");
+        const kinds = new Set((t.media || []).map((m) => m.type));
+        if (!kinds.size) dec("text");
+        if (kinds.has("photo")) dec("photo");
+        if (kinds.has("video")) dec("video");
+        if (kinds.has("animated_gif")) dec("gif");
+        if ((t.media || []).some((m) => m.missing)) dec("missing");
+      }
+      function showConfirm() {
+        const t = state.items[lbIndex];
+        if (!t) return;
+        const hasFiles = (t.media || []).some(
+          (item) => item.file && !item.missing,
+        );
+        $("#lbdelfiles").hidden = !hasFiles;
+        $("#lbkeep").textContent = hasFiles ? "Just the bookmark" : "Remove";
+        $("#lbactions").hidden = true;
+        $("#lbconfirm").hidden = false;
+      }
+      function hideConfirm() {
+        $("#lbconfirm").hidden = true;
+        $("#lbactions").hidden = false;
+      }
+      async function removeTweet(deleteFiles) {
+        const t = state.items[lbIndex];
+        if (!t) return;
+        let res;
+        try {
+          res = await fetch("/api/explore/tweets/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: t.id, delete_files: deleteFiles }),
+          });
+        } catch {
+          res = null;
+        }
+        if (!res || !res.ok) {
+          alert("Failed to remove the bookmark — is the local app running?");
+          return;
+        }
+        // Remove the card in place: no refetch, no masonry reflow.
+        const node = cardNodes[lbIndex];
+        if (node) node.remove();
+        state.items.splice(lbIndex, 1);
+        cardNodes.splice(lbIndex, 1);
+        state.total = Math.max(0, state.total - 1);
+        decrementCounts(t);
+        updateCount();
+        if (state.type === "missing") resetFixAll(!state.items.length);
+        renderTabs();
+        closeLb();
+      }
+      $("#lbreveal").addEventListener("click", async () => {
+        const t = state.items[lbIndex];
+        const item = ((t && t.media) || []).find((m) => m.file && !m.missing);
+        if (!item) return;
+        let res;
+        try {
+          res = await fetch("/api/explore/reveal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file: item.file }),
+          });
+        } catch {
+          res = null;
+        }
+        if (!res || !res.ok)
+          alert("Could not reveal the file — is the local app running?");
+      });
+      $("#lbremove").addEventListener("click", showConfirm);
+      $("#lbcancel").addEventListener("click", hideConfirm);
+      $("#lbkeep").addEventListener("click", () => removeTweet(false));
+      $("#lbdelfiles").addEventListener("click", () => removeTweet(true));
+
+      /* ---- Controls ---- */
       let debounceTimer = null;
       $("#q").addEventListener("input", (e) => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           state.q = e.target.value.trim();
-          state.page = 1;
-          loadTweets();
+          resetAndLoad();
         }, 300);
       });
       $("#sort").addEventListener("change", (e) => {
         state.sort = e.target.value;
-        state.page = 1;
-        loadTweets();
+        resetAndLoad();
       });
-      $("#prev").addEventListener("click", () => {
-        if (state.page > 1) {
-          state.page--;
-          loadTweets();
-        }
+      $("#chip button").addEventListener("click", () => {
+        state.author = "";
+        resetAndLoad();
       });
-      $("#next").addEventListener("click", () => {
-        if (state.page < state.totalPages) {
-          state.page++;
-          loadTweets();
-        }
-      });
-
-      function mediaNode(m) {
-        if (m.file) {
-          const src = "/media/" + encodeURIComponent(m.file);
-          if (m.type === "video" || m.type === "animated_gif") {
-            const v = document.createElement("video");
-            v.src = src;
-            v.controls = true;
-            v.preload = "metadata";
-            if (m.type === "animated_gif") {
-              v.loop = true;
-              v.muted = true;
-            }
-            return v;
-          }
-          const a = document.createElement("a");
-          a.href = src;
-          a.target = "_blank";
-          a.rel = "noopener";
-          const img = document.createElement("img");
-          img.src = src;
-          img.loading = "lazy";
-          img.alt = "";
-          a.append(img);
-          return a;
-        }
-        const label = TYPE_LABELS[m.type] || m.type;
-        return el(
-          "span",
-          "mchip",
-          label.replace(/s$/, "").toLowerCase() + " · not downloaded",
-        );
-      }
-
-      function tweetNode(t) {
-        const art = el("article", "tweet");
-        const head = el("div", "thead");
-        head.append(el("span", "tname", t.name || t.screen_name || "unknown"));
-        if (t.screen_name) {
-          const handle = el("span", "thandle", "@" + t.screen_name);
-          handle.title = "Filter by this author";
-          handle.addEventListener("click", () =>
-            setAuthorFilter(t.screen_name),
-          );
-          head.append(handle);
-        }
-        const date = new Date(t.created_at);
-        head.append(
-          el(
-            "span",
-            "tdate",
-            date.toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            }),
-          ),
-        );
-        const open = el("a", "topen", "Open on X ↗");
-        open.href = t.permanent_url;
-        open.target = "_blank";
-        open.rel = "noopener";
-        head.append(open);
-        art.append(head);
-
-        if (t.full_text) art.append(el("p", "ttext", t.full_text));
-
-        if (t.media && t.media.length) {
-          const wrap = el("div", "mediae");
-          for (const m of t.media) wrap.append(mediaNode(m));
-          art.append(wrap);
-        }
-        return art;
-      }
-
-      async function loadTweets() {
-        const list = $("#list");
-        list.classList.add("loading"); // keep the previous render at reduced opacity
-        if (fetchController) fetchController.abort();
-        fetchController = new AbortController();
-
-        const params = new URLSearchParams();
-        if (state.q) params.set("q", state.q);
-        if (state.author) params.set("author", state.author);
-        if (state.sort !== "newest") params.set("sort", state.sort);
-        params.set("page", String(state.page));
-
-        let data;
-        try {
-          const res = await fetch("/api/explore/tweets?" + params, {
-            signal: fetchController.signal,
-          });
-          if (!res.ok) throw new Error("tweets request failed");
-          data = await res.json();
-        } catch (err) {
-          if (err.name === "AbortError") return;
-          list.classList.remove("loading");
-          list.textContent = "";
-          list.append(
-            el(
-              "div",
-              "empty",
-              "Could not load bookmarks — is the local app running?",
-            ),
-          );
-          return;
-        }
-
-        state.totalPages = Math.max(1, Math.ceil(data.total / data.page_size));
-        $("#count").textContent =
-          fmt(data.total) + (data.total === 1 ? " bookmark" : " bookmarks");
-        $("#pageinfo").textContent =
-          "Page " + data.page + " of " + fmt(state.totalPages);
-        $("#prev").disabled = data.page <= 1;
-        $("#next").disabled = data.page >= state.totalPages;
-
-        list.textContent = "";
-        if (!data.items.length) {
-          list.append(el("div", "empty", "No bookmarks match."));
-        } else {
-          for (const t of data.items) list.append(tweetNode(t));
-        }
-        list.classList.remove("loading");
-      }
 
       /* ---- Boot ---- */
+      (function initFromURL() {
+        const p = new URLSearchParams(location.search);
+        state.q = (p.get("q") || "").trim();
+        const type = p.get("type") || "all";
+        if (KIND_TABS.some(([key]) => key === type)) state.type = type;
+        state.author = (p.get("author") || "").trim();
+        if (p.get("sort") === "oldest") state.sort = "oldest";
+        $("#q").value = state.q;
+        $("#sort").value = state.sort;
+      })();
+      renderTabs();
       loadStats().catch(() => {
-        $("#kpis").append(
-          el(
-            "div",
-            "card empty",
-            "Could not load stats — is the local app running?",
-          ),
-        );
+        $("#statline").textContent =
+          "Could not load stats — is the local app running?";
       });
-      loadTweets();
+      resetAndLoad();
     </script>
   </body>
 </html>

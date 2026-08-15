@@ -8,7 +8,7 @@ import (
 	"twitter-bookmarks-downloader/internal/twitter"
 )
 
-func matchingMediaEntity(media store.MediaModel, entities []twitter.MediaEntity) (twitter.MediaEntity, bool) {
+func MatchingMediaEntity(media store.MediaModel, entities []twitter.MediaEntity) (twitter.MediaEntity, bool) {
 	if media.ID != "" {
 		for _, entity := range entities {
 			if entity.IDStr == media.ID {
@@ -47,7 +47,7 @@ func RepairVideoMediaURLs() (int, error) {
 			continue
 		}
 
-		entity, ok := matchingMediaEntity(media, entities)
+		entity, ok := MatchingMediaEntity(media, entities)
 		if !ok {
 			continue
 		}

@@ -33,6 +33,11 @@ type MediaModel struct {
 	URL     string `json:"media_url_https"`
 	Type    string `json:"type"` // photo, video, animated_gif
 
+	// Pixel dimensions, backfilled from raw tweet JSON or the file on disk;
+	// 0 when unknown. The explorer uses them to reserve layout space.
+	Width  int `gorm:"default:0" json:"width"`
+	Height int `gorm:"default:0" json:"height"`
+
 	// Download Status
 	Downloaded bool `gorm:"default:false" json:"downloaded"`
 	Failed     bool `gorm:"default:false" json:"failed"`

@@ -18,11 +18,17 @@ type VideoInfo struct {
 	Variants []VideoVariant `json:"variants"`
 }
 
+type OriginalInfo struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
 type MediaEntity struct {
-	IDStr         string    `json:"id_str"`
-	Type          string    `json:"type"`
-	MediaURLHttps string    `json:"media_url_https"`
-	VideoInfo     VideoInfo `json:"video_info"`
+	IDStr         string       `json:"id_str"`
+	Type          string       `json:"type"`
+	MediaURLHttps string       `json:"media_url_https"`
+	VideoInfo     VideoInfo    `json:"video_info"`
+	OriginalInfo  OriginalInfo `json:"original_info"`
 }
 
 func DownloadURLForMedia(m MediaEntity) string {

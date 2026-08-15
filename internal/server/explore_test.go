@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twitter-bookmarks-downloader/internal/config"
 	"twitter-bookmarks-downloader/internal/store"
 )
 
@@ -43,6 +47,7 @@ func seedExploreDB(t *testing.T) {
 			ScreenName: "bob",
 			FullText:   "unrelated",
 			CreatedAt:  time.Date(2025, 3, 1, 12, 0, 0, 0, time.Local),
+			RawJSON:    `{"legacy":{"extended_entities":{"media":[{"id_str":"m1","type":"photo","media_url_https":"https://pbs.twimg.com/media/a.jpg","original_info":{"width":1200,"height":800}}]}}}`,
 			Media: []store.MediaModel{
 				{ID: "m1", TweetID: "3", Type: "photo", URL: "https://pbs.twimg.com/media/a.jpg", Downloaded: true},
 			},
@@ -114,4 +119,175 @@ func TestHandleExploreTweetsSearchAndFilter(t *testing.T) {
 	require.Len(t, media, 1)
 	assert.Equal(t, true, media[0].(map[string]any)["downloaded"])
 	assert.Contains(t, media[0].(map[string]any)["file"], "twitter-@bob-")
+	// Dimensions parsed from the stored raw tweet JSON.
+	assert.EqualValues(t, 1200, media[0].(map[string]any)["width"])
+	assert.EqualValues(t, 800, media[0].(map[string]any)["height"])
+}
+
+func TestHandleExploreTweetsTypeFilter(t *testing.T) {
+	seedExploreDB(t)
+	// Give one of Alice's tweets a (not yet downloaded) video.
+	require.NoError(t, store.DB.Create(&store.MediaModel{
+		ID: "m2", TweetID: "2", Type: "video", URL: "https://video.twimg.com/v.mp4",
+	}).Error)
+
+	get := func(query string) map[string]any {
+		rec := httptest.NewRecorder()
+		handleExploreTweets(rec, httptest.NewRequest(http.MethodGet, "/api/explore/tweets"+query, nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+		return payload
+	}
+
+	all := get("")
+	assert.EqualValues(t, 3, all["total"])
+	counts := all["counts"].(map[string]any)
+	assert.EqualValues(t, 3, counts["all"])
+	assert.EqualValues(t, 1, counts["photo"])
+	assert.EqualValues(t, 1, counts["video"])
+	assert.EqualValues(t, 0, counts["gif"])
+	assert.EqualValues(t, 1, counts["text"])
+
+	photos := get("?type=photo")
+	assert.EqualValues(t, 1, photos["total"])
+	assert.Equal(t, "3", photos["items"].([]any)[0].(map[string]any)["id"])
+
+	texts := get("?type=text")
+	assert.EqualValues(t, 1, texts["total"])
+	assert.Equal(t, "1", texts["items"].([]any)[0].(map[string]any)["id"])
+
+	// Type filter composes with the author filter; counts respect the author.
+	aliceVideos := get("?author=alice&type=video")
+	assert.EqualValues(t, 1, aliceVideos["total"])
+	aliceCounts := aliceVideos["counts"].(map[string]any)
+	assert.EqualValues(t, 2, aliceCounts["all"])
+	assert.EqualValues(t, 0, aliceCounts["photo"])
+	assert.EqualValues(t, 1, aliceCounts["video"])
+	assert.EqualValues(t, 1, aliceCounts["text"])
+}
+
+func TestHandleExploreMissingAndDelete(t *testing.T) {
+	seedExploreDB(t)
+	mediaDir := t.TempDir()
+	cfg := config.Default()
+	cfg.MediaDir = mediaDir
+	t.Cleanup(config.SwapForTest(cfg))
+
+	getMissing := func() map[string]any {
+		rec := httptest.NewRecorder()
+		handleExploreMissing(rec, httptest.NewRequest(http.MethodGet, "/api/explore/missing", nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+		return payload
+	}
+
+	// Carol has two downloaded photos and one survives on disk → not missing.
+	carolCreated := time.Date(2025, 4, 1, 12, 0, 0, 0, time.Local)
+	require.NoError(t, store.DB.Create(&store.TweetModel{
+		ID: "4", Name: "Carol", ScreenName: "carol", CreatedAt: carolCreated,
+		Media: []store.MediaModel{
+			{ID: "m4a", TweetID: "4", Index: 0, Type: "photo", URL: "https://pbs.twimg.com/media/c.jpg", Downloaded: true},
+			{ID: "m4b", TweetID: "4", Index: 1, Type: "photo", URL: "https://pbs.twimg.com/media/d.jpg", Downloaded: true},
+		},
+	}).Error)
+	carolFile := "twitter-@carol-" + carolCreated.Format("20060102-150405") + "-4-0.jpg"
+	require.NoError(t, os.WriteFile(filepath.Join(mediaDir, carolFile), []byte("x"), 0o644))
+
+	// Only Bob is listed: his downloaded photo is fully gone from disk.
+	payload := getMissing()
+	assert.EqualValues(t, 1, payload["total"])
+	item := payload["items"].([]any)[0].(map[string]any)
+	assert.Equal(t, "3", item["id"])
+	assert.Equal(t, true, item["media"].([]any)[0].(map[string]any)["missing"])
+
+	// Restore the file → nothing is missing anymore.
+	name := "twitter-@bob-" +
+		time.Date(2025, 3, 1, 12, 0, 0, 0, time.Local).Format("20060102-150405") + "-3.jpg"
+	require.NoError(t, os.WriteFile(filepath.Join(mediaDir, name), []byte("x"), 0o644))
+	assert.EqualValues(t, 0, getMissing()["total"])
+
+	// Delete the bookmark along with its file.
+	rec := httptest.NewRecorder()
+	handleExploreDeleteTweet(rec, httptest.NewRequest(http.MethodPost,
+		"/api/explore/tweets/delete", strings.NewReader(`{"id":"3","delete_files":true}`)))
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.EqualValues(t, 1, resp["files_removed"])
+
+	_, err := os.Stat(filepath.Join(mediaDir, name))
+	assert.True(t, os.IsNotExist(err))
+	var tweetCount, mediaCount int64
+	require.NoError(t, store.DB.Model(&store.TweetModel{}).Count(&tweetCount).Error)
+	require.NoError(t, store.DB.Model(&store.MediaModel{}).Count(&mediaCount).Error)
+	assert.EqualValues(t, 3, tweetCount)
+	assert.EqualValues(t, 2, mediaCount) // Carol's media rows remain
+
+	// Unknown id → 404.
+	rec404 := httptest.NewRecorder()
+	handleExploreDeleteTweet(rec404, httptest.NewRequest(http.MethodPost,
+		"/api/explore/tweets/delete", strings.NewReader(`{"id":"nope"}`)))
+	assert.Equal(t, http.StatusNotFound, rec404.Code)
+}
+
+func TestHandleExploreReveal(t *testing.T) {
+	seedExploreDB(t)
+	mediaDir := t.TempDir()
+	cfg := config.Default()
+	cfg.MediaDir = mediaDir
+	t.Cleanup(config.SwapForTest(cfg))
+
+	originalReveal := revealInFileManager
+	t.Cleanup(func() { revealInFileManager = originalReveal })
+	var revealed string
+	revealInFileManager = func(path string) error {
+		revealed = path
+		return nil
+	}
+
+	post := func(body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		handleExploreReveal(rec, httptest.NewRequest(http.MethodPost,
+			"/api/explore/reveal", strings.NewReader(body)))
+		return rec
+	}
+
+	require.NoError(t, os.WriteFile(filepath.Join(mediaDir, "a.jpg"), []byte("x"), 0o644))
+
+	rec := post(`{"file":"a.jpg"}`)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, filepath.Join(mediaDir, "a.jpg"), revealed)
+
+	assert.Equal(t, http.StatusNotFound, post(`{"file":"nope.jpg"}`).Code)
+	assert.Equal(t, http.StatusBadRequest, post(`{"file":"../secret.txt"}`).Code)
+	assert.Equal(t, http.StatusBadRequest, post(`{"file":""}`).Code)
+}
+
+func TestHandleExploreMissingFix(t *testing.T) {
+	seedExploreDB(t)
+	mediaDir := t.TempDir()
+	cfg := config.Default()
+	cfg.MediaDir = mediaDir
+	t.Cleanup(config.SwapForTest(cfg))
+
+	// Bob's downloaded photo is gone from disk → removed in one call.
+	rec := httptest.NewRecorder()
+	handleExploreMissingFix(rec, httptest.NewRequest(http.MethodPost, "/api/explore/missing/fix", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.EqualValues(t, 1, resp["removed"])
+
+	var tweetCount int64
+	require.NoError(t, store.DB.Model(&store.TweetModel{}).Count(&tweetCount).Error)
+	assert.EqualValues(t, 2, tweetCount)
+
+	// Second call is a no-op.
+	rec2 := httptest.NewRecorder()
+	handleExploreMissingFix(rec2, httptest.NewRequest(http.MethodPost, "/api/explore/missing/fix", nil))
+	require.Equal(t, http.StatusOK, rec2.Code)
+	require.NoError(t, json.Unmarshal(rec2.Body.Bytes(), &resp))
+	assert.EqualValues(t, 0, resp["removed"])
 }
