@@ -69,12 +69,12 @@ func main() {
 		return
 	}
 
-	// Backfill media dimensions (from raw tweet JSON, else file headers) so
-	// the explorer can reserve layout space; no-op once everything is filled.
-	if filled, err := download.BackfillMediaDimensions(); err != nil {
-		logx.Error(eris.Wrap(err, "Failed to backfill media dimensions"))
+	// Backfill media dimensions and video durations (from raw tweet JSON, else
+	// file headers) for the explorer; no-op once everything is filled.
+	if filled, err := download.BackfillMediaMetadata(); err != nil {
+		logx.Error(eris.Wrap(err, "Failed to backfill media metadata"))
 	} else if filled > 0 {
-		logx.Infof("Backfilled dimensions for %d media records", filled)
+		logx.Infof("Backfilled metadata for %d media records", filled)
 	}
 
 	// 4. Start Background Download Worker
