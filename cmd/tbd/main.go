@@ -10,6 +10,7 @@ import (
 
 	"github.com/rotisserie/eris"
 
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/config"
 	"twitter-bookmarks-downloader/internal/download"
 	"twitter-bookmarks-downloader/internal/export"
@@ -43,6 +44,11 @@ func main() {
 		logx.Fatal(eris.Wrap(err, "Failed to init DB"))
 	}
 	logx.Info("Database ready")
+
+	// 3. Load the accounts, moving any pre-accounts bookmarks under a first one.
+	if err := accounts.Load(); err != nil {
+		logx.Fatal(eris.Wrap(err, "Failed to load accounts"))
+	}
 
 	if *exportHandles {
 		count, err := export.UniqueHandles(*handlesOutput)
