@@ -50,6 +50,10 @@ type SyncResponse struct {
 	Message               string `json:"message"`
 	DuplicateLimitReached bool   `json:"duplicate_limit_reached"`
 	SavedCount            int    `json:"saved_count"`
+	// LibraryCount is how many bookmarks the database holds in total once this
+	// batch is in, so the userscript can show the real library size instead of a
+	// per-session tally.
+	LibraryCount int64 `json:"library_count"`
 }
 
 // screenNameRegex is our last line of defense to extract the username if JSON structural parsing fails.
@@ -57,7 +61,7 @@ var screenNameRegex = regexp.MustCompile(`"screen_name"\s*:\s*"([^"]+)"`)
 
 // ProcessSyncRaw acts as the entry point. It unwraps the top-level GraphQL envelope
 // to find the actual list of tweet entries.
-func ProcessSyncRaw(fullJSON json.RawMessage) SyncResponse {
+func ProcessSyncRaw(fullJSON json.RawMessage, accountID string) SyncResponse {
 	// 1. Unwrap the outer GraphQL envelope to access the timeline
 	var resp struct {
 		Data struct {
@@ -127,12 +131,12 @@ func ProcessSyncRaw(fullJSON json.RawMessage) SyncResponse {
 		cleanTweets = append(cleanTweets, rt)
 	}
 
-	return processRawTweetResults(cleanTweets)
+	return processRawTweetResults(cleanTweets, accountID)
 }
 
 // processRawTweetResults iterates over individual tweet JSON objects, extracts metadata,
 // checks for duplicates, and saves them to the database.
-func processRawTweetResults(results []json.RawMessage) SyncResponse {
+func processRawTweetResults(results []json.RawMessage, accountID string) SyncResponse {
 	// 1. Parse every tweet up front so duplicates can be checked in one query
 	// and all inserts can share one transaction.
 	type parsedTweet struct {
@@ -219,15 +223,29 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		ids = append(ids, tweetID)
 	}
 
-	// 2. Check for duplicates with a single IN query instead of one query per tweet.
-	existing := make(map[string]struct{}, len(ids))
+	// 2. Two lookups, each a single IN query: which tweets are stored at all, and
+	// which ones this account already has bookmarked. A tweet another account
+	// archived is still new to this one — it just does not need a second copy of
+	// the row or a second download.
+	stored := make(map[string]struct{}, len(ids))
+	mine := make(map[string]struct{}, len(ids))
 	if len(ids) > 0 {
-		var existingIDs []string
-		if err := store.DB.Model(&store.TweetModel{}).Where("id IN ?", ids).Pluck("id", &existingIDs).Error; err != nil {
+		var storedIDs []string
+		if err := store.DB.Model(&store.TweetModel{}).Where("id IN ?", ids).Pluck("id", &storedIDs).Error; err != nil {
 			logx.Error(err)
 		}
-		for _, id := range existingIDs {
-			existing[id] = struct{}{}
+		for _, id := range storedIDs {
+			stored[id] = struct{}{}
+		}
+
+		var myIDs []string
+		if err := store.DB.Model(&store.AccountBookmarkModel{}).
+			Where("account_id = ? AND tweet_id IN ?", accountID, ids).
+			Pluck("tweet_id", &myIDs).Error; err != nil {
+			logx.Error(err)
+		}
+		for _, id := range myIDs {
+			mine[id] = struct{}{}
 		}
 	}
 
@@ -246,7 +264,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 	// once per batch instead of once per tweet.
 	txErr := store.DB.Transaction(func(tx *gorm.DB) error {
 		for _, pt := range parsed {
-			if _, isDuplicate := existing[pt.id]; isDuplicate {
+			if _, isDuplicate := mine[pt.id]; isDuplicate {
 				backfilled, err := createMissingMedia(tx, pt.id, pt.media)
 				if err != nil {
 					logx.Error(err)
@@ -262,6 +280,19 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			}
 			duplicateStreak = 0
 
+			if err := addBookmark(tx, accountID, pt.id); err != nil {
+				logx.Warnf("Failed to bookmark tweet %s for account %s: %v", pt.id, accountID, err)
+				continue
+			}
+			mine[pt.id] = struct{}{} // A repeated ID later in this batch is a duplicate.
+
+			// Another account already archived the tweet, so the row and its files
+			// stay put; this account simply gained a bookmark.
+			if _, alreadyStored := stored[pt.id]; alreadyStored {
+				savedCount++
+				continue
+			}
+
 			// Parse creation time.
 			createdAt, _ := time.Parse(time.RubyDate, pt.createdAt)
 			if createdAt.IsZero() {
@@ -272,6 +303,7 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 			// Note: We store the raw JSON payload to allow for future re-processing or data recovery.
 			tm := &store.TweetModel{
 				ID:           pt.id,
+				AccountID:    accountID,
 				FullText:     pt.fullText,
 				Name:         pt.name,
 				ScreenName:   pt.screenName,
@@ -294,14 +326,19 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 				}
 			}
 
-			if err := tx.Create(tm).Error; err == nil {
-				savedCount++
-				existing[pt.id] = struct{}{} // A repeated ID later in this batch counts as a duplicate.
-				savedDebug = append(savedDebug, savedInfo{
-					URL:        tm.PermanentURL,
-					MediaFiles: mediaFilenames,
-				})
+			if err := tx.Create(tm).Error; err != nil {
+				// Swallowing this looks exactly like "the sync found nothing new",
+				// and the tweet would quietly never come back on a later pass.
+				logx.Warnf("Failed to save tweet %s: %v", pt.id, err)
+				continue
 			}
+
+			savedCount++
+			stored[pt.id] = struct{}{}
+			savedDebug = append(savedDebug, savedInfo{
+				URL:        tm.PermanentURL,
+				MediaFiles: mediaFilenames,
+			})
 		}
 		return nil
 	})
@@ -312,6 +349,12 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 
 	if savedCount > 0 {
 		download.Nudge()
+	}
+
+	var libraryCount int64
+	if err := store.DB.Model(&store.AccountBookmarkModel{}).
+		Where("account_id = ?", accountID).Count(&libraryCount).Error; err != nil {
+		logx.Error(err)
 	}
 
 	logx.Infof("Batch done: %d new bookmarks saved", savedCount)
@@ -331,7 +374,19 @@ func processRawTweetResults(results []json.RawMessage) SyncResponse {
 		Message:               "Raw sync complete",
 		DuplicateLimitReached: duplicateLimitReached,
 		SavedCount:            savedCount,
+		LibraryCount:          libraryCount,
 	}
+}
+
+// addBookmark records that this account has the tweet bookmarked. Repeats are
+// ignored, so re-scanning a page costs nothing.
+func addBookmark(db *gorm.DB, accountID, tweetID string) error {
+	membership := store.AccountBookmarkModel{
+		AccountID: accountID,
+		TweetID:   tweetID,
+		SyncedAt:  time.Now(),
+	}
+	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(&membership).Error
 }
 
 func mediaModelsForTweet(tweetID string, entities []twitter.MediaEntity) []store.MediaModel {

@@ -17,6 +17,7 @@ import (
 	"github.com/rotisserie/eris"
 	"gorm.io/gorm"
 
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/config"
 	"twitter-bookmarks-downloader/internal/logx"
 	"twitter-bookmarks-downloader/internal/store"
@@ -94,31 +95,56 @@ func ShouldDownloadURL(rawURL string) bool {
 
 func ShouldDownload(media store.MediaModel) bool {
 	current := config.Current()
+	return shouldDownload(media, current.DownloadVideos, current.DownloadImages)
+}
 
+// ShouldDownloadFor answers for one account, whose settings can differ from the
+// global defaults.
+func ShouldDownloadFor(accountID string, media store.MediaModel) bool {
+	videos, images := accounts.Settings(accountID)
+	return shouldDownload(media, videos, images)
+}
+
+func shouldDownload(media store.MediaModel, videos, images bool) bool {
 	switch media.Type {
 	case "photo":
-		return current.DownloadImages
+		return images
 	case "video", "animated_gif":
-		return current.DownloadVideos
+		return videos
+	case "":
+		if media.URL == "" {
+			return false
+		}
+		if twitter.IsMP4MediaURL(media.URL) {
+			return videos
+		}
+		return images
 	default:
-		return ShouldDownloadURL(media.URL)
+		if twitter.IsMP4MediaURL(media.URL) {
+			return videos
+		}
+		return images
 	}
 }
 
+// pendingQuery narrows to media still worth fetching. Each account decides what
+// it downloads, so the filter follows the media back to the account that owns
+// its tweet; COALESCE covers rows whose account predates the accounts table and
+// falls back to the global defaults. Unknown media types stay in — the precise
+// call is ShouldDownloadFor, and this only has to avoid excluding work.
 func pendingQuery() *gorm.DB {
-	query := store.DB.Model(&store.MediaModel{}).Where("downloaded = ? AND failed = ?", false, false)
 	current := config.Current()
 
-	switch {
-	case current.DownloadImages && current.DownloadVideos:
-		return query
-	case current.DownloadImages:
-		return query.Where("type = ?", "photo")
-	case current.DownloadVideos:
-		return query.Where("type IN ?", []string{"video", "animated_gif"})
-	default:
-		return query.Where("1 = 0")
-	}
+	return store.DB.Model(&store.MediaModel{}).
+		Where("downloaded = ? AND failed = ?", false, false).
+		Where(`EXISTS (
+			SELECT 1 FROM tweets
+			LEFT JOIN accounts ON accounts.id = tweets.account_id
+			WHERE tweets.id = media.tweet_id AND (
+				(media.type = 'photo' AND COALESCE(accounts.download_images, ?) = 1)
+				OR (media.type IN ('video', 'animated_gif') AND COALESCE(accounts.download_videos, ?) = 1)
+				OR media.type NOT IN ('photo', 'video', 'animated_gif')
+			))`, current.DownloadImages, current.DownloadVideos)
 }
 
 // maxConcurrentDownloads keeps small images flowing while a large video downloads,
@@ -150,6 +176,7 @@ func ProcessQueue() {
 
 	// One media-count query per tweet, shared by every item in the batch.
 	mediaCounts := make(map[string]int64, len(mediaList))
+	tweetIDs := make([]string, 0, len(mediaList))
 	for _, media := range mediaList {
 		if _, ok := mediaCounts[media.TweetID]; ok {
 			continue
@@ -160,6 +187,24 @@ func ProcessQueue() {
 			continue
 		}
 		mediaCounts[media.TweetID] = count
+		tweetIDs = append(tweetIDs, media.TweetID)
+	}
+
+	// Which account owns each tweet decides both what gets downloaded and where
+	// the file lands, so resolve the whole batch in one query.
+	owners := make(map[string]string, len(tweetIDs))
+	if len(tweetIDs) > 0 {
+		var rows []struct {
+			ID        string
+			AccountID string
+		}
+		if err := store.DB.Model(&store.TweetModel{}).Select("id", "account_id").
+			Where("id IN ?", tweetIDs).Find(&rows).Error; err != nil {
+			logx.Error(eris.Wrap(err, "Failed to resolve tweet accounts"))
+		}
+		for _, row := range rows {
+			owners[row.ID] = row.AccountID
+		}
 	}
 
 	completed := total - pending
@@ -169,7 +214,7 @@ func ProcessQueue() {
 	for i := range mediaList {
 		media := &mediaList[i]
 		progressLabel := fmt.Sprintf("%d/%d", completed+int64(i)+1, total)
-		if !ShouldDownload(*media) {
+		if !ShouldDownloadFor(owners[media.TweetID], *media) {
 			continue
 		}
 		mediaCount, ok := mediaCounts[media.TweetID]
@@ -205,7 +250,7 @@ func processMediaDownload(media *store.MediaModel, progressLabel string, mediaCo
 	// Select only the columns BuildFilename and logging need; RawJSON holds the
 	// full GraphQL payload and would dominate the read otherwise.
 	var tweet store.TweetModel
-	if err := store.DB.Select("id", "screen_name", "created_at", "permanent_url").
+	if err := store.DB.Select("id", "screen_name", "created_at", "permanent_url", "account_id").
 		First(&tweet, "id = ?", media.TweetID).Error; err != nil {
 		return eris.Wrap(err, "Tweet not found for media")
 	}
@@ -223,7 +268,7 @@ func processMediaDownload(media *store.MediaModel, progressLabel string, mediaCo
 	}
 
 	filename := BuildFilename(&tweet, media.Index, mediaCount, parsedURL)
-	outputPath := filepath.Join(config.Current().MediaDir, filename)
+	outputPath := filepath.Join(accounts.MediaDir(tweet.AccountID), filename)
 
 	if err := downloadFile(parsedURL.String(), outputPath, tweet.CreatedAt, progressLabel); err != nil {
 		return eris.Wrapf(err, "URL: %s (from Tweet: %s)", media.URL, tweet.PermanentURL)

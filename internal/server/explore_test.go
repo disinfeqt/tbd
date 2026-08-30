@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/config"
 	"twitter-bookmarks-downloader/internal/logx"
 	"twitter-bookmarks-downloader/internal/store"
@@ -62,6 +63,9 @@ func seedExploreDB(t *testing.T) {
 		},
 	}
 	require.NoError(t, store.DB.Create(&tweets).Error)
+	// Runs the startup migration, so these tweets belong to an account the way
+	// they would after a real upgrade.
+	require.NoError(t, accounts.Load())
 }
 
 func TestHandleExploreStats(t *testing.T) {
@@ -424,4 +428,70 @@ func TestHandleExploreMissingFix(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec2.Code)
 	require.NoError(t, json.Unmarshal(rec2.Body.Bytes(), &resp))
 	assert.EqualValues(t, 0, resp["removed"])
+}
+
+// Media lives under /media/<account>/<file> because every account has its own
+// folder, and the same tweet saved twice produces the same file name in both.
+func TestHandleMediaFileServesPerAccount(t *testing.T) {
+	dir := t.TempDir()
+	t.Cleanup(config.SwapForTest(config.Config{
+		MediaDir:       dir,
+		DownloadVideos: true,
+		DownloadImages: true,
+	}))
+	seedExploreDB(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.jpg"), []byte("jpeg"), 0o644))
+
+	rec := httptest.NewRecorder()
+	handleMediaFile(rec, httptest.NewRequest(http.MethodGet, "/media/"+accounts.LegacyID+"/a.jpg", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "jpeg", rec.Body.String())
+
+	// A path that climbs out of the folder is not a file name.
+	rec = httptest.NewRecorder()
+	handleMediaFile(rec, httptest.NewRequest(http.MethodGet, "/media/"+accounts.LegacyID+"/../../etc/hosts", nil))
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+// Every number in the header belongs to the account on screen. Media counts
+// reach an account through the tweet they hang off, and used to span all of them.
+func TestHandleExploreStatsCountsOnlyThisAccount(t *testing.T) {
+	seedExploreDB(t)
+
+	// A second account with its own bookmark and its own two media files.
+	require.NoError(t, store.DB.Create(&store.AccountModel{
+		ID: "other", Handle: "bob", DownloadVideos: true, DownloadImages: true,
+	}).Error)
+	require.NoError(t, store.DB.Create(&store.TweetModel{
+		ID: "9", AccountID: "other", ScreenName: "carol", CreatedAt: time.Now(), SyncedAt: time.Now(),
+		Media: []store.MediaModel{
+			{ID: "m9a", TweetID: "9", Type: "video", URL: "https://video.twimg.com/9.mp4", Downloaded: true},
+			{ID: "m9b", TweetID: "9", Type: "photo", URL: "https://pbs.twimg.com/9.jpg", Downloaded: true},
+		},
+	}).Error)
+	require.NoError(t, store.DB.Create(&store.AccountBookmarkModel{
+		AccountID: "other", TweetID: "9", SyncedAt: time.Now(),
+	}).Error)
+	require.NoError(t, accounts.Load())
+
+	statsFor := func(account string) exploreStats {
+		rec := httptest.NewRecorder()
+		handleExploreStats(rec, httptest.NewRequest(http.MethodGet, "/api/explore/stats?account="+account, nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		var out exploreStats
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return out
+	}
+
+	first := statsFor(accounts.LegacyID)
+	assert.Equal(t, int64(3), first.Totals.Bookmarks)
+	assert.Equal(t, int64(1), first.Totals.MediaTotal, "the other account's files are not this account's")
+	assert.Equal(t, int64(1), first.Totals.MediaDownloaded)
+	assert.Equal(t, int64(1), first.Totals.TweetsWithMedia)
+	assert.Len(t, first.MediaTypes, 1)
+
+	second := statsFor("other")
+	assert.Equal(t, int64(1), second.Totals.Bookmarks)
+	assert.Equal(t, int64(2), second.Totals.MediaTotal)
+	assert.Len(t, second.MediaTypes, 2)
 }

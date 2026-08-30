@@ -20,7 +20,7 @@ import (
 	"github.com/rotisserie/eris"
 	"gorm.io/gorm"
 
-	"twitter-bookmarks-downloader/internal/config"
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/download"
 	"twitter-bookmarks-downloader/internal/logx"
 	"twitter-bookmarks-downloader/internal/store"
@@ -41,6 +41,8 @@ func registerExploreRoutes() {
 	http.HandleFunc("/api/explore/authors", handleExploreAuthors)
 	http.HandleFunc("/api/explore/logs", handleExploreLogs)
 	http.HandleFunc("/api/explore/downloads", handleExploreDownloads)
+	http.HandleFunc("/api/explore/accounts", handleExploreAccounts)
+	http.HandleFunc("/api/explore/setup", handleExploreSetup)
 	http.HandleFunc("/media/", handleMediaFile)
 }
 
@@ -62,9 +64,53 @@ func handleMediaFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// Resolve the media dir per request so settings changes apply immediately.
-	fs := http.FileServer(http.Dir(config.Current().MediaDir))
-	http.StripPrefix("/media/", fs).ServeHTTP(w, r)
+	// /media/<account>/<file>: every account has its own folder, and the same
+	// tweet saved by two accounts produces the same file name in both. The dir
+	// is resolved per request so a settings change applies immediately.
+	rest := strings.TrimPrefix(r.URL.Path, "/media/")
+	accountID, name, split := strings.Cut(rest, "/")
+	if !split {
+		accountID, name = accounts.Resolve(""), rest
+	}
+	decoded, err := url.PathUnescape(name)
+	if err != nil || decoded == "" || filepath.Base(decoded) != decoded {
+		http.NotFound(w, r)
+		return
+	}
+	path := filepath.Join(accounts.MediaDir(accountID), decoded)
+	if info, err := os.Stat(path); err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, path)
+}
+
+// requestAccount resolves which account's archive a dashboard request is about,
+// falling back to the most recently synced one.
+func requestAccount(r *http.Request) string {
+	return accounts.Resolve(r.URL.Query().Get("account"))
+}
+
+// scopeToAccount limits a tweets query to the bookmarks one account holds. The
+// tweet row itself may be shared with another account that bookmarked it too.
+func scopeToAccount(query *gorm.DB, accountID string) *gorm.DB {
+	if accountID == "" {
+		// No accounts on record: there is nothing to isolate, and an empty
+		// dashboard would be a worse answer than the whole archive.
+		return query
+	}
+	return query.Where(`EXISTS (SELECT 1 FROM account_bookmarks
+		WHERE account_bookmarks.tweet_id = tweets.id AND account_bookmarks.account_id = ?)`, accountID)
+}
+
+// scopeMediaToAccount does the same for a query over media rows, which reach an
+// account through the tweet they hang off.
+func scopeMediaToAccount(query *gorm.DB, accountID string) *gorm.DB {
+	if accountID == "" {
+		return query
+	}
+	return query.Where(`EXISTS (SELECT 1 FROM account_bookmarks
+		WHERE account_bookmarks.tweet_id = media.tweet_id AND account_bookmarks.account_id = ?)`, accountID)
 }
 
 type authorStat struct {
@@ -114,8 +160,10 @@ func handleExploreStats(w http.ResponseWriter, r *http.Request) {
 		Name       string
 		CreatedAt  time.Time
 	}
+	accountID := requestAccount(r)
+
 	var rows []tweetRow
-	if err := store.DB.Model(&store.TweetModel{}).
+	if err := scopeToAccount(store.DB.Model(&store.TweetModel{}), accountID).
 		Select("screen_name", "name", "created_at").
 		Find(&rows).Error; err != nil {
 		logx.Error(eris.Wrap(err, "Failed to query tweets for stats"))
@@ -189,17 +237,22 @@ func handleExploreStats(w http.ResponseWriter, r *http.Request) {
 		stats.TopAuthors = stats.TopAuthors[:10]
 	}
 
-	// Media aggregates are cheap COUNT queries.
-	if err := store.DB.Model(&store.MediaModel{}).Count(&stats.Totals.MediaTotal).Error; err != nil {
+	// Media aggregates are cheap COUNT queries, each scoped the same way the
+	// bookmark counts are — a number that silently spans every account belongs
+	// to no account on screen.
+	media := func() *gorm.DB {
+		return scopeMediaToAccount(store.DB.Model(&store.MediaModel{}), accountID)
+	}
+	if err := media().Count(&stats.Totals.MediaTotal).Error; err != nil {
 		logx.Error(eris.Wrap(err, "Failed to count media"))
 	}
-	if err := store.DB.Model(&store.MediaModel{}).Where("downloaded = ?", true).Count(&stats.Totals.MediaDownloaded).Error; err != nil {
+	if err := media().Where("downloaded = ?", true).Count(&stats.Totals.MediaDownloaded).Error; err != nil {
 		logx.Error(eris.Wrap(err, "Failed to count downloaded media"))
 	}
-	if err := store.DB.Model(&store.MediaModel{}).Where("failed = ?", true).Count(&stats.Totals.MediaFailed).Error; err != nil {
+	if err := media().Where("failed = ?", true).Count(&stats.Totals.MediaFailed).Error; err != nil {
 		logx.Error(eris.Wrap(err, "Failed to count failed media"))
 	}
-	if err := store.DB.Model(&store.MediaModel{}).
+	if err := media().
 		Distinct("tweet_id").Count(&stats.Totals.TweetsWithMedia).Error; err != nil {
 		logx.Error(eris.Wrap(err, "Failed to count tweets with media"))
 	}
@@ -209,7 +262,7 @@ func handleExploreStats(w http.ResponseWriter, r *http.Request) {
 		Count int
 	}
 	var typeRows []typeRow
-	if err := store.DB.Model(&store.MediaModel{}).
+	if err := media().
 		Select("type, COUNT(*) as count").Group("type").Order("count DESC").
 		Find(&typeRows).Error; err != nil {
 		logx.Error(eris.Wrap(err, "Failed to count media types"))
@@ -222,6 +275,7 @@ func handleExploreStats(w http.ResponseWriter, r *http.Request) {
 }
 
 type exploreMediaItem struct {
+	AccountID  string `json:"account_id"`
 	Type       string `json:"type"`
 	Downloaded bool   `json:"downloaded"`
 	File       string `json:"file,omitempty"`
@@ -233,6 +287,7 @@ type exploreMediaItem struct {
 
 type exploreTweetItem struct {
 	ID           string             `json:"id"`
+	AccountID    string             `json:"account_id"`
 	Name         string             `json:"name"`
 	ScreenName   string             `json:"screen_name"`
 	FullText     string             `json:"full_text"`
@@ -286,8 +341,9 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 
 	// Search and author filters, without the media-type filter, so the same
 	// base can also produce the per-type tab counts.
+	accountID := requestAccount(r)
 	applyBaseFilters := func() *gorm.DB {
-		query := store.DB.Model(&store.TweetModel{})
+		query := scopeToAccount(store.DB.Model(&store.TweetModel{}), accountID)
 		if q != "" {
 			like := "%" + escapeLike(q) + "%"
 			// full_text is stored HTML-escaped, so "&" in a query must also
@@ -360,7 +416,7 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 
 	var tweets []store.TweetModel
 	if err := applyFilters().
-		Select("id", "name", "screen_name", "full_text", "created_at", "permanent_url", "raw_json").
+		Select("id", "account_id", "name", "screen_name", "full_text", "created_at", "permanent_url", "raw_json").
 		Preload("Media", func(db *gorm.DB) *gorm.DB { return db.Order(`"index" ASC`) }).
 		Order(sortOrder).
 		Offset((page - 1) * explorePageSize).
@@ -388,10 +444,11 @@ func handleExploreTweets(w http.ResponseWriter, r *http.Request) {
 func exploreItemFromTweet(tweet *store.TweetModel) exploreTweetItem {
 	item := exploreTweetItem{
 		ID:         tweet.ID,
+		AccountID:  tweet.AccountID,
 		Name:       tweet.Name,
 		ScreenName: tweet.ScreenName,
 		// X stores full_text HTML-escaped (& < > become entities).
-		FullText: html.UnescapeString(tweet.FullText),
+		FullText:     html.UnescapeString(tweet.FullText),
 		CreatedAt:    tweet.CreatedAt,
 		PermanentURL: tweet.PermanentURL,
 		Media:        []exploreMediaItem{},
@@ -403,7 +460,11 @@ func exploreItemFromTweet(tweet *store.TweetModel) exploreTweetItem {
 		entities, _ = twitter.MediaEntitiesFromRawTweet(tweet.RawJSON)
 	}
 	for _, media := range tweet.Media {
-		mi := exploreMediaItem{Type: media.Type, Downloaded: media.Downloaded}
+		mi := exploreMediaItem{
+			Type:       media.Type,
+			Downloaded: media.Downloaded,
+			AccountID:  tweet.AccountID,
+		}
 		if media.Downloaded {
 			if parsedURL, err := url.Parse(media.URL); err == nil {
 				mi.File = download.BuildFilename(tweet, media.Index, len(tweet.Media), parsedURL)
@@ -470,7 +531,7 @@ func handleExploreAuthors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var rows []authorStat
-	if err := store.DB.Model(&store.TweetModel{}).
+	if err := scopeToAccount(store.DB.Model(&store.TweetModel{}), requestAccount(r)).
 		Select("screen_name, MAX(name) AS name, COUNT(*) AS count").
 		Where("screen_name != ''").
 		Group("LOWER(screen_name)").
@@ -496,14 +557,10 @@ func handleExploreMissing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mediaDir := config.Current().MediaDir
-	if info, err := os.Stat(mediaDir); err != nil || !info.IsDir() {
-		http.Error(w, "Media folder is not accessible", http.StatusInternalServerError)
-		return
-	}
+	accountID := requestAccount(r)
 
 	var tweets []store.TweetModel
-	if err := store.DB.
+	if err := scopeToAccount(store.DB.Model(&store.TweetModel{}), accountID).
 		Where("EXISTS (SELECT 1 FROM media WHERE media.tweet_id = tweets.id AND media.downloaded = ?)", true).
 		Preload("Media", func(db *gorm.DB) *gorm.DB { return db.Order(`"index" ASC`) }).
 		Order("synced_at DESC, created_at DESC").
@@ -513,9 +570,21 @@ func handleExploreMissing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(tweets) == 0 {
+		writeJSON(w, map[string]any{"total": 0, "items": []exploreTweetItem{}})
+		return
+	}
+	// Nothing downloaded can be declared missing when the folder itself is
+	// gone — an unmounted drive would otherwise empty the whole archive.
+	if info, err := os.Stat(accounts.MediaDir(accountID)); err != nil || !info.IsDir() {
+		http.Error(w, "Media folder is not accessible", http.StatusInternalServerError)
+		return
+	}
+
 	items := []exploreTweetItem{}
 	for i := range tweets {
 		item := exploreItemFromTweet(&tweets[i])
+		mediaDir := accounts.MediaDir(tweets[i].AccountID)
 		verified := false
 		present := false
 		for j := range item.Media {
@@ -558,15 +627,16 @@ func handleExploreMissingFix(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Media folder is not accessible", http.StatusInternalServerError)
 		return
 	}
-	if len(tweets) > 0 {
-		if err := download.RemoveTweets(tweets); err != nil {
-			logx.Error(eris.Wrap(err, "Failed to remove bookmarks with deleted media"))
-			http.Error(w, "Database error", http.StatusInternalServerError)
-			return
-		}
+
+	// Only what the account on screen can see gets removed.
+	removed, err := removeBookmarks(requestAccount(r), tweets)
+	if err != nil {
+		logx.Error(eris.Wrap(err, "Failed to remove bookmarks with deleted media"))
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
 	}
 
-	writeJSON(w, map[string]any{"removed": len(tweets)})
+	writeJSON(w, map[string]any{"removed": removed})
 }
 
 // revealInFileManager shows the file in the OS file manager. A var so tests
@@ -592,7 +662,8 @@ func handleExploreReveal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		File string `json:"file"`
+		File    string `json:"file"`
+		Account string `json:"account"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
 		req.File == "" || filepath.Base(req.File) != req.File {
@@ -600,7 +671,7 @@ func handleExploreReveal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := filepath.Join(config.Current().MediaDir, req.File)
+	path := filepath.Join(accounts.MediaDir(accounts.Resolve(req.Account)), req.File)
 	if _, err := os.Stat(path); err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -625,6 +696,7 @@ func handleExploreDeleteTweet(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		ID          string `json:"id"`
+		Account     string `json:"account"`
 		DeleteFiles bool   `json:"delete_files"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
@@ -643,9 +715,35 @@ func handleExploreDeleteTweet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Deleting is per account: the bookmark leaves this account's archive, and
+	// the tweet and its files only go when no account holds it any more.
+	accountID := accounts.Resolve(req.Account)
+	if err := store.DB.Where("account_id = ? AND tweet_id = ?", accountID, tweet.ID).
+		Delete(&store.AccountBookmarkModel{}).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to remove the bookmark from the account"))
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	var heldElsewhere int64
+	if err := store.DB.Model(&store.AccountBookmarkModel{}).
+		Where("tweet_id = ?", tweet.ID).Count(&heldElsewhere).Error; err != nil {
+		logx.Error(eris.Wrap(err, "Failed to count remaining bookmark holders"))
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if heldElsewhere > 0 {
+		writeJSON(w, map[string]any{
+			"deleted":       true,
+			"files_removed": 0,
+			"shared":        true,
+		})
+		return
+	}
+
 	filesRemoved := 0
 	if req.DeleteFiles {
-		mediaDir := config.Current().MediaDir
+		mediaDir := accounts.MediaDir(tweet.AccountID)
 		for _, media := range tweet.Media {
 			if !media.Downloaded {
 				continue

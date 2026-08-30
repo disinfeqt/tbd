@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/config"
+	"twitter-bookmarks-downloader/internal/store"
 )
 
 func TestHandleSettingsGetAndPost(t *testing.T) {
@@ -19,6 +21,13 @@ func TestHandleSettingsGetAndPost(t *testing.T) {
 		DownloadVideos: true,
 		DownloadImages: true,
 	}))
+
+	// An empty archive has no accounts, so settings fall through to the global
+	// config this test is about.
+	originalDB := store.DB
+	t.Cleanup(func() { store.DB = originalDB })
+	require.NoError(t, store.Init(":memory:"))
+	require.NoError(t, accounts.Load())
 
 	originalCwd, err := os.Getwd()
 	require.NoError(t, err)

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/config"
 	"twitter-bookmarks-downloader/internal/store"
 )
@@ -46,4 +47,52 @@ func TestProcessQueueDoesNotMarkDisabledImagesDownloaded(t *testing.T) {
 	assert.False(t, media.Downloaded)
 	assert.False(t, media.Failed)
 	assert.Equal(t, 0, media.RetryCount)
+}
+
+// Download settings are per account: one account can have videos off while
+// another keeps them on, and the queue has to respect both at once.
+func TestPendingQueueFollowsAccountSettings(t *testing.T) {
+	originalDB := store.DB
+	t.Cleanup(func() {
+		store.DB = originalDB
+	})
+
+	t.Cleanup(config.SwapForTest(config.Config{
+		MediaDir:       t.TempDir(),
+		DownloadVideos: true,
+		DownloadImages: true,
+	}))
+	require.NoError(t, store.Init(":memory:"))
+
+	require.NoError(t, store.DB.Create(&[]store.AccountModel{
+		{ID: "keeps-video", DownloadVideos: true, DownloadImages: true},
+		{ID: "no-video", DownloadVideos: false, DownloadImages: true},
+	}).Error)
+	require.NoError(t, accounts.Load())
+
+	tweets := []store.TweetModel{
+		{
+			ID: "t1", AccountID: "keeps-video", ScreenName: "alice", CreatedAt: time.Now(),
+			Media: []store.MediaModel{
+				{ID: "video-on", TweetID: "t1", Type: "video", URL: "https://video.twimg.com/a.mp4"},
+				{ID: "photo-on", TweetID: "t1", Type: "photo", URL: "https://pbs.twimg.com/a.jpg"},
+			},
+		},
+		{
+			ID: "t2", AccountID: "no-video", ScreenName: "bob", CreatedAt: time.Now(),
+			Media: []store.MediaModel{
+				{ID: "video-off", TweetID: "t2", Type: "video", URL: "https://video.twimg.com/b.mp4"},
+				{ID: "photo-still-on", TweetID: "t2", Type: "photo", URL: "https://pbs.twimg.com/b.jpg"},
+			},
+		},
+	}
+	require.NoError(t, store.DB.Create(&tweets).Error)
+
+	var queued []string
+	require.NoError(t, pendingQuery().Order("id").Pluck("id", &queued).Error)
+	assert.Equal(t, []string{"photo-on", "photo-still-on", "video-on"}, queued)
+
+	assert.True(t, ShouldDownloadFor("keeps-video", store.MediaModel{Type: "video"}))
+	assert.False(t, ShouldDownloadFor("no-video", store.MediaModel{Type: "video"}))
+	assert.True(t, ShouldDownloadFor("no-video", store.MediaModel{Type: "photo"}))
 }

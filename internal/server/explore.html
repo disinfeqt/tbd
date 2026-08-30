@@ -79,7 +79,7 @@
       /* ---- Header: identity + one quiet stats line ---- */
       header.page {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         justify-content: space-between;
         gap: 16px;
         flex-wrap: wrap;
@@ -106,6 +106,12 @@
         outline-offset: 2px;
         border-radius: 4px;
       }
+      .headright {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      /* Context, not navigation: everything clickable lives in the menu. */
       .statline {
         display: flex;
         align-items: center;
@@ -115,42 +121,320 @@
         color: var(--muted);
         font-variant-numeric: tabular-nums;
       }
-      .statline .stat {
+      .statline button.stat {
+        font: inherit;
+        color: var(--ink-2);
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+      }
+      .statline button.stat:hover {
+        color: var(--ink);
+      }
+      .statline button.stat:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+      .statline b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .statline .warn {
         display: inline-flex;
         align-items: center;
         gap: 5px;
         white-space: nowrap;
         font: inherit;
+        color: var(--warnc);
+        background: none;
+        border: 1px solid var(--warnc);
+        border-radius: 999px;
+        padding: 2px 10px;
+        cursor: pointer;
+      }
+
+      /* ---- Browse menu ---- */
+      .menu {
+        position: relative;
+      }
+      .menu summary {
+        list-style: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12.5px;
         color: var(--ink-2);
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 999px;
-        padding: 3px 12px;
-      }
-      .statline .stat b {
-        color: var(--ink);
-        font-weight: 600;
-      }
-      .statline button.stat {
+        padding: 4px 12px;
         cursor: pointer;
-        transition:
-          border-color 0.15s ease,
-          color 0.15s ease;
+        white-space: nowrap;
       }
-      .statline button.stat:hover {
+      .menu summary::-webkit-details-marker {
+        display: none;
+      }
+      .menu summary::after {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: translateY(-2px) rotate(45deg);
+      }
+      .menu summary:hover,
+      .menu[open] summary {
         color: var(--ink);
         border-color: var(--muted);
       }
-      .statline button.stat:focus-visible {
+      .menu summary:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 1px;
       }
-      .statline .stat.live::before {
+      .menu summary .alert {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--warnc);
+      }
+      .menupop {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        min-width: 210px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 6px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+        z-index: 40;
+      }
+      .menuitem {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        width: 100%;
+        font: inherit;
+        font-size: 13px;
+        white-space: nowrap;
+        color: var(--ink-2);
+        background: none;
+        border: none;
+        border-radius: 8px;
+        padding: 7px 10px;
+        cursor: pointer;
+        text-align: left;
+      }
+      .menuitem:hover {
+        color: var(--ink);
+        background: var(--page);
+      }
+      .menuitem[aria-current="true"] {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .menuitem .n {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .menuitem.attention {
+        color: var(--warnc);
+      }
+      .menuitem.live .n::after {
         content: "";
+        display: inline-block;
         width: 6px;
         height: 6px;
         border-radius: 50%;
         background: var(--ok);
+      }
+      .menusep {
+        height: 1px;
+        background: var(--border);
+        margin: 5px 4px;
+      }
+
+      /* ---- Account switcher ---- */
+      .brandrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .acct {
+        position: relative;
+      }
+      /* Measures the selected label so the select can be sized to it. */
+      .acct .probe {
+        position: absolute;
+        visibility: hidden;
+        white-space: pre;
+        font-size: 12.5px;
+        pointer-events: none;
+      }
+      .acct select {
+        appearance: none;
+        -webkit-appearance: none;
+        font: inherit;
+        font-size: 12.5px;
+        color: var(--ink-2);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 14px;
+        cursor: pointer;
+      }
+      .acct select:hover {
+        color: var(--ink);
+        border-color: var(--muted);
+      }
+      /* Disabled only means there is nowhere else to switch to — it still has
+         to read as the name of the archive on screen. */
+      .acct select:disabled {
+        opacity: 1;
+        cursor: default;
+      }
+      .acct select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+
+      /* ---- Setup + settings ---- */
+      .panel {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+      }
+      .panel h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .panel p {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 10px;
+        line-height: 1.5;
+      }
+      .panel p:last-child {
+        margin-bottom: 0;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 10px 0;
+        border-top: 1px solid var(--border);
+      }
+      .step:first-of-type {
+        border-top: none;
+      }
+      .stepn {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink-2);
+      }
+      .step.done .stepn {
+        background: var(--ok);
+        border-color: var(--ok);
+        color: var(--page);
+      }
+      .btn {
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--page);
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        border-radius: 999px;
+        padding: 6px 16px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .btn:hover {
+        background: var(--accent-strong);
+        border-color: var(--accent-strong);
+      }
+      .btn.quiet {
+        color: var(--ink-2);
+        background: var(--surface);
+        border-color: var(--border);
+      }
+      .btn.quiet:hover {
+        color: var(--ink);
+        background: var(--surface);
+        border-color: var(--muted);
+      }
+      .field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+        flex-wrap: wrap;
+      }
+      .field label {
+        font-size: 13px;
+        color: var(--ink-2);
+        min-width: 108px;
+      }
+      .field input[type="text"] {
+        flex: 1;
+        min-width: 200px;
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink);
+        background: var(--page);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 10px;
+      }
+      .field input[type="text"]:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -1px;
+      }
+      .toggles {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        color: var(--ink-2);
+      }
+      .toggles label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        background: var(--muted);
+        margin-right: 6px;
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .dot.warn {
+        background: var(--warnc);
+      }
+      .saved {
+        font-size: 12.5px;
+        color: var(--ok);
       }
 
       /* ---- Subpages (authors / media / timeline) ---- */
@@ -1153,10 +1437,22 @@
   <body>
     <main>
       <header class="page">
-        <h1>
-          <button id="home" title="Show all bookmarks">TBD Explorer</button>
-        </h1>
-        <div class="statline" id="statline">Your X bookmarks archive</div>
+        <div class="brandrow">
+          <h1>
+            <button id="home" title="Show all bookmarks">TBD Explorer</button>
+          </h1>
+          <span class="acct" id="acctwrap" hidden>
+            <select id="acct" aria-label="Account being viewed"></select>
+            <span class="probe" id="acctprobe" aria-hidden="true"></span>
+          </span>
+        </div>
+        <div class="headright">
+          <div class="statline" id="statline">Your X bookmarks archive</div>
+          <details class="menu" id="menu">
+            <summary id="menubtn">Menu</summary>
+            <div class="menupop" id="menupop"></div>
+          </details>
+        </div>
       </header>
 
       <div id="dlstrip" hidden>
@@ -1311,7 +1607,8 @@
 
       /* ---- State ---- */
       const state = {
-        view: "grid", // grid | authors | media | timeline
+        view: "grid", // grid | authors | media | timeline | settings | setup
+        account: "", // which X account's archive is on screen
         q: "",
         type: "all",
         author: "",
@@ -1324,52 +1621,199 @@
       };
       let fetchController = null;
       let statsCache = null;
+      let accountsCache = null;
+      let setupCache = null;
+
+      // Every archive query is scoped to one account; the activity log and the
+      // download strip stay app-wide and are left alone.
+      function withAccount(url) {
+        if (!state.account) return url;
+        return (
+          url +
+          (url.includes("?") ? "&" : "?") +
+          "account=" +
+          encodeURIComponent(state.account)
+        );
+      }
+
+      async function loadAccounts(force) {
+        if (accountsCache && !force) return accountsCache;
+        const res = await fetch("/api/explore/accounts");
+        if (!res.ok) throw new Error("accounts request failed");
+        accountsCache = await res.json();
+        return accountsCache;
+      }
+
+      async function loadSetup(force) {
+        if (setupCache && !force) return setupCache;
+        const res = await fetch("/api/explore/setup");
+        if (!res.ok) throw new Error("setup request failed");
+        setupCache = await res.json();
+        return setupCache;
+      }
+
+      const accountName = (a) =>
+        a.handle ? "@" + a.handle : "Account " + a.id.slice(0, 8);
+
+      function renderAccountSwitcher(data) {
+        const items = (data && data.items) || [];
+        // Always name the account on screen: the explorer shows exactly one
+        // archive at a time, and that is invisible if nothing says which.
+        $("#acctwrap").hidden = items.length === 0;
+        $("#acct").disabled = items.length < 2;
+        const sel = $("#acct");
+        sel.textContent = "";
+        for (const a of items) {
+          const option = el("option", "", accountName(a));
+          option.value = a.id;
+          sel.append(option);
+        }
+        if (state.account) sel.value = state.account;
+        fitAccountSelect();
+      }
+
+      // A native select is as wide as its widest option, so one long handle
+      // stretches the header for every account. Size it to the one on screen.
+      function fitAccountSelect() {
+        const sel = $("#acct");
+        const option = sel.options[sel.selectedIndex];
+        if (!option) return;
+        const probe = $("#acctprobe");
+        probe.textContent = option.textContent;
+        const width = probe.getBoundingClientRect().width;
+        // 28px of horizontal padding, 2px of border, 2px of slack.
+        if (width > 0) sel.style.width = Math.ceil(width) + 32 + "px";
+      }
+
+      function switchAccount(id) {
+        if (!id || id === state.account) return;
+        state.account = id;
+        statsCache = null;
+        authorsCache = null;
+        clearFilters();
+        loadStats().catch(() => {});
+        setView("grid");
+      }
 
       async function ensureStats() {
         if (statsCache) return statsCache;
-        const res = await fetch("/api/explore/stats");
+        const res = await fetch(withAccount("/api/explore/stats"));
         if (!res.ok) throw new Error("stats request failed");
         statsCache = await res.json();
         return statsCache;
       }
 
-      /* ---- Header stats: one quiet line, each a door to a subpage ---- */
+      /* ---- Header: what this archive is, and one menu for everywhere else ---- */
+      const monthYear = (iso) =>
+        new Date(iso).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+        });
+
+      // "Aug 2026 – Aug 2026" says nothing twice and wraps onto two lines.
+      // Collapse the range to whatever actually varies.
+      function timeSpan(firstISO, lastISO) {
+        const first = new Date(firstISO);
+        const last = new Date(lastISO);
+        if (first.getFullYear() !== last.getFullYear())
+          return first.getFullYear() + " – " + last.getFullYear();
+        if (first.getMonth() === last.getMonth()) return monthYear(firstISO);
+        const month = (d) =>
+          d.toLocaleDateString(undefined, { month: "short" });
+        return month(first) + " – " + month(last) + " " + last.getFullYear();
+      }
+
+      // Something the user has to act on: nothing is syncing, or the script
+      // that does the syncing is behind the one this app ships.
+      function setupAlert() {
+        if (!setupCache) return "";
+        if (!setupCache.script.installed) return "Userscript not detected";
+        if (setupCache.script.outdated) return "Userscript update available";
+        if (setupCache.bookmarks === 0) return "Finish setting up";
+        return "";
+      }
+
+      let lastStats = null;
+
       async function loadStats() {
         const stats = await ensureStats();
+        lastStats = stats;
+
         const line = $("#statline");
         line.textContent = "";
-        const add = (value, label, onClick) => {
-          const s = el(onClick ? "button" : "span", "stat");
-          if (value != null) s.append(el("b", "", value), " ");
-          s.append(label);
-          if (onClick) s.addEventListener("click", onClick);
-          line.append(s);
-          return s;
+        const count = stats.totals.bookmarks;
+        const total = el("button", "stat");
+        total.title = "Show all bookmarks";
+        total.append(
+          el("b", "", fmt(count)),
+          count === 1 ? " bookmark" : " bookmarks",
+        );
+        total.addEventListener("click", goHome);
+        line.append(total);
+
+        const alert = setupAlert();
+        if (alert) {
+          const chip = el("button", "warn", alert);
+          chip.addEventListener("click", () => setView("setup"));
+          line.append(chip);
+        }
+
+        renderMenu(stats, alert);
+      }
+
+      function renderMenu(stats, alert) {
+        const btn = $("#menubtn");
+        btn.textContent = "Menu";
+        if (alert) btn.prepend(el("span", "alert"));
+
+        const pop = $("#menupop");
+        pop.textContent = "";
+        const item = (view, label, count, cls) => {
+          const b = el("button", "menuitem" + (cls ? " " + cls : ""));
+          b.append(el("span", "", label), el("span", "n", count || ""));
+          if (state.view === view) b.setAttribute("aria-current", "true");
+          b.addEventListener("click", () => {
+            $("#menu").open = false;
+            if (view === "grid") goHome();
+            else setView(view);
+          });
+          pop.append(b);
+          return b;
         };
-        add(fmt(stats.totals.bookmarks), "bookmarks", goHome);
-        // Only show the fraction while downloads are still catching up.
+
         const downloaded = stats.totals.media_downloaded;
         const mediaTotal = stats.totals.media_total;
-        add(
+        item("grid", "Bookmarks", fmt(stats.totals.bookmarks));
+        item(
+          "media",
+          "Media files",
+          // The fraction only matters while downloads are catching up.
           downloaded < mediaTotal
             ? fmt(downloaded) + " / " + fmt(mediaTotal)
             : fmt(mediaTotal),
-          "media files",
-          () => setView("media"),
         );
-        add(fmt(stats.totals.authors), "authors", () => setView("authors"));
+        item("authors", "Authors", fmt(stats.totals.authors));
         if (stats.first_bookmark) {
-          const opt = { year: "numeric", month: "short" };
-          add(
-            null,
-            new Date(stats.first_bookmark).toLocaleDateString(undefined, opt) +
-              " – " +
-              new Date(stats.last_bookmark).toLocaleDateString(undefined, opt),
-            () => setView("timeline"),
+          item(
+            "timeline",
+            "Timeline",
+            timeSpan(stats.first_bookmark, stats.last_bookmark),
           );
         }
-        add(null, "Activity", () => setView("activity")).classList.add("live");
+        item("activity", "Activity", "", "live");
+        pop.append(el("div", "menusep"));
+        item("settings", "Settings", "");
+        item("setup", "Set up", alert ? "!" : "", alert ? "attention" : "");
       }
+
+      // A menu that stays open after you click past it is its own kind of clutter.
+      document.addEventListener("click", (e) => {
+        const menu = $("#menu");
+        if (menu.open && !menu.contains(e.target)) menu.open = false;
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") $("#menu").open = false;
+      });
 
       /* ---- Tabs with live counts ---- */
       function renderTabs() {
@@ -1442,7 +1886,13 @@
         });
 
       /* ---- Media helpers ---- */
-      const mediaSrc = (m) => "/media/" + encodeURIComponent(m.file);
+      // /media/<account>/<file>: each account keeps its own folder, and the
+      // same tweet saved by two accounts produces the same file name in both.
+      const mediaSrc = (m) =>
+        "/media/" +
+        encodeURIComponent(m.account_id || state.account) +
+        "/" +
+        encodeURIComponent(m.file);
       const isMotion = (m) => m.type === "video" || m.type === "animated_gif";
       function fmtDuration(ms) {
         const total = Math.round(ms / 1000);
@@ -1576,6 +2026,7 @@
         if (state.month) p.set("month", state.month);
         if (state.type !== "all") p.set("type", state.type);
         if (state.sort !== "newest") p.set("sort", state.sort);
+        if (state.account) p.set("account", state.account);
         p.set("page", String(state.page));
         return p;
       }
@@ -1656,7 +2107,7 @@
         resetFixAll(true);
 
         const data = await fetchInto(
-          "/api/explore/missing",
+          withAccount("/api/explore/missing"),
           "Could not check for missing files — is the local app running?",
         );
         if (!data) return;
@@ -1710,7 +2161,9 @@
         btn.disabled = true;
         let res;
         try {
-          res = await fetch("/api/explore/missing/fix", { method: "POST" });
+          res = await fetch(withAccount("/api/explore/missing/fix"), {
+            method: "POST",
+          });
         } catch {
           res = null;
         }
@@ -1758,6 +2211,7 @@
         if (state.author) p.set("author", state.author);
         if (state.month) p.set("month", state.month);
         if (state.sort !== "newest") p.set("sort", state.sort);
+        if (state.account) p.set("account", state.account);
         const qs = p.toString();
         history.replaceState(null, "", qs ? "?" + qs : location.pathname);
       }
@@ -1802,6 +2256,7 @@
 
       function setView(view) {
         state.view = view;
+        if (lastStats) renderMenu(lastStats, setupAlert());
         syncURL();
         applyView();
         if (view === "grid") resetAndLoad();
@@ -1832,13 +2287,15 @@
         media: "Media",
         timeline: "Timeline",
         activity: "Activity",
+        settings: "Settings",
+        setup: "Set up",
       };
 
       async function renderSubpage() {
         const sp = $("#subpage");
         sp.textContent = "";
         const head = el("div", "sphead");
-        const back = el("button", "spback", "← Bookmarks");
+        const back = el("button", "spback", "←");
         back.addEventListener("click", () => setView("grid"));
         head.append(back, el("h2", "sptitle", VIEW_TITLES[state.view] || ""));
         sp.append(head);
@@ -1850,12 +2307,262 @@
           else if (state.view === "media") await renderMedia(body);
           else if (state.view === "timeline") await renderTimeline(body);
           else if (state.view === "activity") await renderActivity(body);
+          else if (state.view === "settings") await renderSettings(body);
+          else if (state.view === "setup") await renderSetup(body);
         } catch {
           body.textContent = "";
           body.append(
             el("div", "spnote", "Could not load — is the local app running?"),
           );
         }
+      }
+
+      /* ---- Setup: what is still missing between here and a synced archive ---- */
+      const TAMPERMONKEY_URL =
+        "https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo";
+
+      function setupStep(n, done, title, text, action) {
+        const step = el("div", "step" + (done ? " done" : ""));
+        step.append(el("span", "stepn", done ? "✓" : String(n)));
+        const bodyCol = el("div");
+        bodyCol.append(el("h3", "", title));
+        if (text) bodyCol.append(el("p", "", text));
+        if (action) bodyCol.append(action);
+        step.append(bodyCol);
+        return step;
+      }
+
+      function linkButton(label, href, quiet) {
+        const a = el("a", "btn" + (quiet ? " quiet" : ""), label);
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        return a;
+      }
+
+      async function renderSetup(body) {
+        const data = await loadSetup(true);
+        const script = data.script || {};
+        body.textContent = "";
+
+        const head = el("div", "panel");
+        head.append(el("h3", "", "Getting bookmarks in"));
+        const status = el("p");
+        status.append(
+          el(
+            "span",
+            "dot" +
+              (script.installed ? (script.outdated ? " warn" : " ok") : ""),
+          ),
+        );
+        if (!script.installed) {
+          status.append(
+            "The userscript has not called in since TBD started. Open x.com in a tab once it is installed.",
+          );
+        } else if (script.outdated) {
+          status.append(
+            "Userscript v" +
+              script.version +
+              " is installed, but v" +
+              script.latest_version +
+              " ships with this app. Reinstall to update.",
+          );
+        } else {
+          status.append("Userscript v" + script.version + " is connected.");
+        }
+        head.append(status);
+        body.append(head);
+
+        const steps = el("div", "panel");
+        steps.append(
+          setupStep(
+            1,
+            script.installed,
+            "Install Tampermonkey",
+            "The browser extension that runs the userscript. Turn on Allow User Scripts in its settings, or nothing will run.",
+            linkButton("Get Tampermonkey", TAMPERMONKEY_URL, true),
+          ),
+        );
+        steps.append(
+          setupStep(
+            2,
+            script.installed && !script.outdated,
+            "Install the userscript",
+            "Tampermonkey opens its install prompt for this link. Use the same link later to update.",
+            linkButton(
+              script.installed && !script.outdated
+                ? "Reinstall the script"
+                : "Install the script",
+              data.install_url,
+              script.installed && !script.outdated,
+            ),
+          ),
+        );
+        steps.append(
+          setupStep(
+            3,
+            data.bookmarks > 0,
+            "Open your X bookmarks",
+            "Syncing starts on its own and the panel in the corner counts what it saves. Leave TBD running while it works.",
+            linkButton(
+              "Open x.com bookmarks",
+              data.sync_url,
+              data.bookmarks > 0,
+            ),
+          ),
+        );
+        body.append(steps);
+
+        const accountsPanel = el("div", "panel");
+        accountsPanel.append(el("h3", "", "Accounts"));
+        const views = data.accounts || [];
+        if (!views.length) {
+          accountsPanel.append(
+            el(
+              "p",
+              "",
+              "Nothing synced yet. Whichever X account you are signed in as becomes the first one, and every account after that keeps its own bookmarks and its own media folder.",
+            ),
+          );
+        } else {
+          for (const account of views) {
+            accountsPanel.append(
+              el(
+                "p",
+                "",
+                accountName(account) +
+                  " — " +
+                  fmt(account.bookmarks) +
+                  " bookmarks in " +
+                  account.media_dir,
+              ),
+            );
+          }
+          const go = el("button", "btn quiet", "Account settings");
+          go.addEventListener("click", () => setView("settings"));
+          accountsPanel.append(go);
+        }
+        body.append(accountsPanel);
+
+        // The steps are completed elsewhere — in the extension, in an x.com tab —
+        // so refresh while the page is open instead of asking for a reload.
+        clearTimeout(setupTimer);
+        setupTimer = setTimeout(() => {
+          if (state.view === "setup") renderSubpage();
+        }, 4000);
+      }
+
+      let setupTimer = null;
+
+      /* ---- Settings: one panel per account, plus the shared defaults ---- */
+      function settingsPanel(title, note, values, patchID) {
+        const panel = el("div", "panel");
+        panel.append(el("h3", "", title));
+        if (note) panel.append(el("p", "", note));
+
+        const saved = el("span", "saved");
+        const save = async (patch) => {
+          let res;
+          try {
+            res = await fetch("/api/explore/accounts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(Object.assign({ id: patchID }, patch)),
+            });
+          } catch {
+            res = null;
+          }
+          if (!res || !res.ok) {
+            alert("Could not save — is the local app running?");
+            return;
+          }
+          accountsCache = await res.json();
+          statsCache = null;
+          saved.textContent = "Saved";
+          setTimeout(() => (saved.textContent = ""), 2000);
+        };
+
+        const field = el("div", "field");
+        field.append(el("label", "", "Media folder"));
+        const input = el("input");
+        input.type = "text";
+        input.value = values.media_dir || "";
+        input.placeholder = "media";
+        field.append(input);
+        const saveBtn = el("button", "btn quiet", "Save");
+        saveBtn.addEventListener("click", () =>
+          save({ media_dir: input.value }),
+        );
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") save({ media_dir: input.value });
+        });
+        field.append(saveBtn, saved);
+        panel.append(field);
+
+        const toggles = el("div", "toggles");
+        const toggle = (label, key) => {
+          const wrap = el("label");
+          const box = el("input");
+          box.type = "checkbox";
+          box.checked = values[key] !== false;
+          box.addEventListener("change", () => save({ [key]: box.checked }));
+          wrap.append(box, label);
+          return wrap;
+        };
+        toggles.append(
+          toggle("Download videos", "download_videos"),
+          toggle("Download images", "download_images"),
+        );
+        panel.append(toggles);
+        return panel;
+      }
+
+      async function renderSettings(body) {
+        const data = await loadAccounts(true);
+        body.textContent = "";
+
+        const items = data.items || [];
+        for (const account of items) {
+          const synced = account.last_sync_at
+            ? "last synced " +
+              new Date(account.last_sync_at).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })
+            : "not synced yet";
+          body.append(
+            settingsPanel(
+              accountName(account),
+              fmt(account.bookmarks) + " bookmarks · " + synced,
+              account,
+              account.id,
+            ),
+          );
+        }
+
+        body.append(
+          settingsPanel(
+            "Defaults for new accounts",
+            "Where a newly seen account starts. Existing accounts keep their own settings.",
+            data.defaults || {},
+            "",
+          ),
+        );
+
+        const help = el("div", "panel");
+        help.append(el("h3", "", "Userscript"));
+        help.append(
+          el(
+            "p",
+            "",
+            "Install it, update it, or check whether it is talking to this app.",
+          ),
+        );
+        const go = el("button", "btn quiet", "Open setup");
+        go.addEventListener("click", () => setView("setup"));
+        help.append(go);
+        body.append(help);
       }
 
       function statRow(cls, cells, count, max, onClick) {
@@ -1873,7 +2580,7 @@
       let authorsCache = null;
       async function renderAuthors(body) {
         if (!authorsCache) {
-          const res = await fetch("/api/explore/authors");
+          const res = await fetch(withAccount("/api/explore/authors"));
           if (!res.ok) throw new Error("authors request failed");
           authorsCache = (await res.json()).items;
         }
@@ -2304,7 +3011,11 @@
           res = await fetch("/api/explore/tweets/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: t.id, delete_files: deleteFiles }),
+            body: JSON.stringify({
+              id: t.id,
+              account: state.account,
+              delete_files: deleteFiles,
+            }),
           });
         } catch {
           res = null;
@@ -2334,7 +3045,10 @@
           res = await fetch("/api/explore/reveal", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ file: item.file }),
+            body: JSON.stringify({
+              file: item.file,
+              account: item.account_id || state.account,
+            }),
           });
         } catch {
           res = null;
@@ -2433,11 +3147,24 @@
       });
 
       /* ---- Boot ---- */
+      let viewFromURL = false;
       (function initFromURL() {
         const p = new URLSearchParams(location.search);
         const view = p.get("view");
-        if (["authors", "media", "timeline", "activity"].includes(view))
+        if (
+          [
+            "authors",
+            "media",
+            "timeline",
+            "activity",
+            "settings",
+            "setup",
+          ].includes(view)
+        ) {
           state.view = view;
+          viewFromURL = true;
+        }
+        state.account = (p.get("account") || "").trim();
         state.q = (p.get("q") || "").trim();
         const type = p.get("type") || "all";
         if (KIND_TABS.some(([key]) => key === type)) state.type = type;
@@ -2458,15 +3185,38 @@
         $("#q").value = state.q;
         $("#sort").value = state.sort;
       })();
-      renderTabs();
-      loadStats().catch(() => {
-        $("#statline").textContent =
-          "Could not load stats — is the local app running?";
+      $("#acct").addEventListener("change", (e) => {
+        fitAccountSelect();
+        switchAccount(e.target.value);
       });
-      applyView();
-      if (state.view === "grid") resetAndLoad();
-      else renderSubpage();
-      pollDownloads();
+
+      (async function boot() {
+        try {
+          const [data, setup] = await Promise.all([
+            loadAccounts(),
+            loadSetup(),
+          ]);
+          const items = data.items || [];
+          if (!items.some((a) => a.id === state.account))
+            state.account = data.default || "";
+          renderAccountSwitcher(data);
+          // An empty archive means nothing is syncing yet, and an empty grid
+          // explains none of it — open the tutorial instead.
+          if (!viewFromURL && setup.bookmarks === 0) state.view = "setup";
+        } catch {
+          // The dashboard still works against a single account without this.
+        }
+
+        renderTabs();
+        loadStats().catch(() => {
+          $("#statline").textContent =
+            "Could not load stats — is the local app running?";
+        });
+        applyView();
+        if (state.view === "grid") resetAndLoad();
+        else renderSubpage();
+        pollDownloads();
+      })();
     </script>
   </body>
 </html>

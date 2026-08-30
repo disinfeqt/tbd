@@ -14,7 +14,7 @@ import (
 
 	"github.com/rotisserie/eris"
 
-	"twitter-bookmarks-downloader/internal/config"
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/logx"
 	"twitter-bookmarks-downloader/internal/store"
 	"twitter-bookmarks-downloader/internal/twitter"
@@ -36,11 +36,11 @@ func BackfillMediaMetadata() (int, error) {
 		return 0, eris.Wrap(err, "failed to query media lacking metadata")
 	}
 
-	mediaDir := config.Current().MediaDir
 	filled := 0
 
 	for i := range tweets {
 		tweet := &tweets[i]
+		mediaDir := accounts.MediaDir(tweet.AccountID)
 		var entities []twitter.MediaEntity
 		if tweet.RawJSON != "" {
 			entities, _ = twitter.MediaEntitiesFromRawTweet(tweet.RawJSON)

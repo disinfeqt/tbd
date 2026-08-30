@@ -10,6 +10,7 @@ import (
 	"github.com/rotisserie/eris"
 	"gorm.io/gorm"
 
+	"twitter-bookmarks-downloader/internal/accounts"
 	"twitter-bookmarks-downloader/internal/config"
 	"twitter-bookmarks-downloader/internal/store"
 )
@@ -21,9 +22,18 @@ import (
 // are never candidates, and a tweet is kept as long as at least one of its
 // downloaded files is still present or cannot be verified.
 func FindTweetsWithDeletedMedia() ([]store.TweetModel, error) {
-	mediaDir := config.Current().MediaDir
-	if info, err := os.Stat(mediaDir); err != nil || !info.IsDir() {
-		return nil, eris.Errorf("media folder %q is not accessible — refusing to treat every bookmark as deleted", mediaDir)
+	// Every account's folder has to be readable: an unmounted drive would
+	// otherwise make that account's whole archive look deleted.
+	for _, account := range accounts.All() {
+		dir := accounts.MediaDir(account.ID)
+		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+			return nil, eris.Errorf("media folder %q is not accessible — refusing to treat every bookmark as deleted", dir)
+		}
+	}
+	if fallback := config.Current().MediaDir; len(accounts.All()) == 0 {
+		if info, err := os.Stat(fallback); err != nil || !info.IsDir() {
+			return nil, eris.Errorf("media folder %q is not accessible — refusing to treat every bookmark as deleted", fallback)
+		}
 	}
 
 	var tweets []store.TweetModel
@@ -37,6 +47,7 @@ func FindTweetsWithDeletedMedia() ([]store.TweetModel, error) {
 	var deleted []store.TweetModel
 	for i := range tweets {
 		tweet := &tweets[i]
+		mediaDir := accounts.MediaDir(tweet.AccountID)
 		verified := false
 		present := false
 		for _, media := range tweet.Media {
@@ -74,6 +85,9 @@ func RemoveTweets(tweets []store.TweetModel) error {
 			chunk := ids[start:min(start+chunkSize, len(ids))]
 			if err := tx.Where("tweet_id IN ?", chunk).Delete(&store.MediaModel{}).Error; err != nil {
 				return eris.Wrap(err, "failed to delete media records")
+			}
+			if err := tx.Where("tweet_id IN ?", chunk).Delete(&store.AccountBookmarkModel{}).Error; err != nil {
+				return eris.Wrap(err, "failed to delete account bookmarks")
 			}
 			if err := tx.Where("id IN ?", chunk).Delete(&store.TweetModel{}).Error; err != nil {
 				return eris.Wrap(err, "failed to delete tweets")
