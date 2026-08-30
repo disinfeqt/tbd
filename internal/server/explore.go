@@ -31,6 +31,7 @@ import (
 var exploreHTML []byte
 
 func registerExploreRoutes() {
+	registerAssetRoutes()
 	http.HandleFunc("/", handleExploreHome)
 	http.HandleFunc("/api/explore/stats", handleExploreStats)
 	http.HandleFunc("/api/explore/tweets", handleExploreTweets)

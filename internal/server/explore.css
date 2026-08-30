@@ -1,0 +1,1984 @@
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --accent: #2a78d6;
+  --accent-strong: #1c5cab;
+  --scrim: rgba(12, 12, 10, 0.72);
+  --badge-bg: rgba(12, 12, 10, 0.6);
+  --badge-ink: #ffffff;
+  --lightbox: rgba(18, 18, 16, 0.82);
+  --danger: #b3372f;
+  --ok: #2e7d32;
+  --warnc: #b45309;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;
+    --accent-strong: #6da7ec;
+    --scrim: rgba(8, 8, 7, 0.78);
+    --badge-bg: rgba(8, 8, 7, 0.62);
+    --badge-ink: #ffffff;
+    --lightbox: rgba(5, 5, 4, 0.86);
+    --danger: #e06055;
+    --ok: #6abf73;
+    --warnc: #f0a24a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+[hidden] {
+  display: none !important;
+}
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* Standalone (home-screen) mode draws under the status bar and home
+   indicator; the insets keep the page clear of both and are zero anywhere
+   else. */
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) 20px
+    calc(72px + env(safe-area-inset-bottom));
+}
+
+/* ---- Header: identity + one quiet stats line ---- */
+header.page {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+header.page h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+header.page h1 button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+header.page h1 button:hover {
+  color: var(--accent);
+}
+header.page h1 button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.headright {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* Context, not navigation: everything clickable lives in the menu. */
+.statline:empty {
+  display: none;
+}
+.statline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.statline .warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font: inherit;
+  color: var(--warnc);
+  background: none;
+  border: 1px solid var(--warnc);
+  border-radius: 999px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+/* ---- Browse menu ---- */
+.menu {
+  position: relative;
+}
+.menu summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+.menu summary::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.menu summary:hover,
+.menu[open] summary {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.menu summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.menu summary .alert {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warnc);
+}
+.menupop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  z-index: 40;
+}
+.menuitem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.menuitem:hover {
+  color: var(--ink);
+  background: var(--page);
+}
+.menuitem[aria-current="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.menuitem .n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.menuitem.attention {
+  color: var(--warnc);
+}
+.menuitem.live .n::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.menusep {
+  height: 1px;
+  background: var(--border);
+  margin: 5px 4px;
+}
+
+/* ---- Account switcher ---- */
+.brandrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.acct {
+  position: relative;
+}
+/* Measures the selected label so the select can be sized to it. */
+.acct .probe {
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+  font-size: 12.5px;
+  pointer-events: none;
+}
+.acct select {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+.acct select:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+/* Disabled only means there is nowhere else to switch to — it still has
+   to read as the name of the archive on screen. */
+.acct select:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.acct select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- Setup + settings ---- */
+.panel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.panel h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.panel p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+.panel p:last-child {
+  margin-bottom: 0;
+}
+.step {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.step:first-of-type {
+  border-top: none;
+}
+.stepn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.step.done .stepn {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--page);
+}
+.btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--page);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 6px 16px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.btn:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+.btn.quiet {
+  color: var(--ink-2);
+  background: var(--surface);
+  border-color: var(--border);
+}
+.btn.quiet:hover {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--muted);
+}
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+.field label {
+  font-size: 13px;
+  color: var(--ink-2);
+  min-width: 108px;
+}
+.field input[type="text"] {
+  flex: 1;
+  min-width: 200px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.field input[type="text"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.toggles {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--muted);
+  margin-right: 6px;
+}
+.dot.ok {
+  background: var(--ok);
+}
+.dot.warn {
+  background: var(--warnc);
+}
+.saved {
+  font-size: 12.5px;
+  color: var(--ok);
+}
+
+/* ---- Subpages (authors / media / timeline) ---- */
+.sphead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 14px;
+}
+.spback {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+.spback:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.sptitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+.spsummary {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  font-variant-numeric: tabular-nums;
+}
+.spbody {
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+}
+.srow {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.srow:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.srow.author {
+  grid-template-columns: 20px minmax(140px, 1fr) 2fr 48px;
+}
+.srow.plain {
+  grid-template-columns: minmax(90px, 130px) 1fr 48px;
+}
+.srow .swho {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.srow .swho b {
+  font-weight: 600;
+}
+.srow .shandle {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-left: 6px;
+}
+.srow .slabel {
+  font-size: 13px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.srow .strack {
+  height: 10px;
+  position: relative;
+}
+.srow .sbar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  opacity: 0.7;
+  border-radius: 0 3px 3px 0;
+  min-width: 2px;
+}
+.srow .scount {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.spnote {
+  color: var(--muted);
+  padding: 12px 0;
+}
+.spbody.wide {
+  max-width: 960px;
+}
+.loglist {
+  max-height: 70vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 8px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.logrow {
+  display: grid;
+  grid-template-columns: 66px 14px 1fr;
+  gap: 8px;
+  padding: 1px 14px;
+  align-items: baseline;
+}
+.logrow .ltime {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.logrow .lmark {
+  text-align: center;
+  font-weight: 700;
+}
+.logrow.info .lmark {
+  color: var(--ok);
+}
+.logrow.warn .lmark {
+  color: var(--warnc);
+}
+.logrow.error .lmark {
+  color: var(--danger);
+}
+.logrow .lmsg {
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.logrow.error .lmsg {
+  color: var(--danger);
+}
+
+/* ---- Download progress strip ---- */
+#dlstrip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+.dlhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+#dlpct {
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.dltrack {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--grid);
+  overflow: hidden;
+}
+.dlbar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+#dlfiles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.dlfile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 56px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.dlfile .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.dlfile .ftrack {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--grid);
+  overflow: hidden;
+}
+.dlfile .fbar {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.75;
+  transition: width 0.6s ease;
+}
+.dlfile .fpct {
+  text-align: right;
+}
+
+/* ---- Sticky filter bar ---- */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  margin-bottom: 6px;
+  background: color-mix(in srgb, var(--page) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.search {
+  position: relative;
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+.search svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 14px;
+  height: 14px;
+  stroke: var(--muted);
+  fill: none;
+  stroke-width: 2;
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px 6px 30px;
+}
+.search input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+}
+.tabs button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabs button .n {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.tabs button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--page);
+}
+.tabs button[aria-pressed="true"] .n {
+  color: color-mix(in srgb, var(--page) 70%, transparent);
+}
+.tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The wrapper only becomes a box on narrow screens; here its children
+   lay out as direct members of .bar, as if it were not there. */
+.barrow {
+  display: contents;
+}
+.selwrap {
+  position: relative;
+  margin-left: auto;
+}
+.selwrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 28px 5px 12px;
+  cursor: pointer;
+}
+.selwrap select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.selwrap::after {
+  content: "";
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  translate: 0 -70%;
+  rotate: 45deg;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  pointer-events: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 999px;
+  padding: 3px 6px 3px 12px;
+  font-size: 13px;
+}
+.chip[hidden] {
+  display: none;
+}
+.chip button {
+  font: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-2);
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.countbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 2px 12px;
+}
+#count {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.fixall {
+  font: inherit;
+  font-size: 12px;
+  color: var(--danger);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: 999px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+.fixall:hover {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.fixall.armed {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.fixall[hidden] {
+  display: none;
+}
+
+/* ---- Masonry media grid ----
+   JS-managed columns (new cards go to the shortest column) so
+   "Load more" appends without reflowing existing cards. */
+#grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+#grid.loading {
+  opacity: 0.5;
+}
+#grid .gcol {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#grid .empty {
+  flex: 1;
+}
+
+.mcard {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--surface);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  box-shadow: 0 0 0 1px var(--border);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+  /* Keep the card on its own compositor layer even at rest: fractional
+     masonry tile heights otherwise rasterize the media's bottom edge as
+     a 1px seam that vanishes once hovering promotes the layer. */
+  will-change: transform;
+}
+.mcard:hover,
+.mcard:focus-visible {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 10px 28px rgba(0, 0, 0, 0.16);
+}
+.mcard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mcard,
+  .mcard:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+.thumb {
+  position: relative;
+  width: 100%;
+  display: block;
+  background: var(--grid);
+}
+.thumb img,
+.thumb video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.thumb.pending {
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0 10px,
+      color-mix(in srgb, var(--baseline) 24%, transparent) 10px 11px
+    ),
+    var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+  pointer-events: none;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--badge-bg);
+  color: var(--badge-ink);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(4px);
+}
+.badge.right {
+  margin-left: auto;
+}
+.badge svg {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
+}
+
+/* hover text reveal over the media */
+.peek {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  padding: 28px 12px 12px;
+  background: linear-gradient(180deg, transparent, var(--scrim));
+  opacity: 0;
+  translate: 0 6px;
+  transition:
+    opacity 0.18s ease,
+    translate 0.18s ease;
+  pointer-events: none;
+}
+/* Clamp lives on an inner, padding-free element — clamping the padded
+   box lets clipped lines bleed into the padding area. */
+.peek .ptext {
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mcard:hover .peek,
+.mcard:focus-visible .peek {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* caption row below the media */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+}
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+.meta .handle {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meta .when {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+/* text-only bookmarks as quote cards */
+.tcard .quote {
+  padding: 18px 16px 6px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tcard .quote::before {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  margin-bottom: 12px;
+}
+
+.sentinel {
+  padding: 26px 0 6px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sentinel[hidden] {
+  display: none;
+}
+.empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 48px 0;
+}
+
+/* ---- Lightbox ---- */
+#lb {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--lightbox);
+  backdrop-filter: blur(8px);
+  padding: 20px;
+}
+#lb.open {
+  display: flex;
+}
+.lb-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  width: min(1280px, 100%);
+  /* Fixed height so media can size against it and fit unclipped. */
+  height: min(940px, 92vh);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.lb-media {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  overflow-y: auto;
+  background: var(--page);
+}
+.lb-media img,
+.lb-media video {
+  /* Natural size, capped to the panel so nothing is clipped or upscaled. */
+  display: block;
+  flex: none;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+}
+.lb-media .pending {
+  flex: 1;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 160px;
+}
+.lb-media .lb-quote {
+  margin: auto;
+  padding: 32px;
+  font-size: 19px;
+  line-height: 1.55;
+  max-width: 34ch;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* Multi-media tweets show one item at a time with a thumbnail strip. */
+.lb-media.carousel {
+  overflow: hidden;
+  gap: 0;
+}
+.lb-stage {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  min-height: 0;
+  display: flex;
+}
+.lb-count {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.lb-mnav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+.lb-mnav.prev {
+  left: 12px;
+}
+.lb-mnav.next {
+  right: 12px;
+}
+.lb-stage:hover .lb-mnav:not(:disabled),
+.lb-mnav:focus-visible {
+  opacity: 1;
+}
+.lb-mnav:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.lb-mnav:disabled {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+.lb-strip {
+  flex: none;
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  overflow-x: auto;
+}
+.lb-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--surface);
+  opacity: 0.55;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s;
+}
+.lb-thumb:hover {
+  opacity: 0.85;
+}
+.lb-thumb.active {
+  opacity: 1;
+  border-color: var(--accent);
+}
+.lb-thumb img,
+.lb-thumb video {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  object-fit: cover;
+}
+.lb-thumb.pending {
+  display: grid;
+  place-items: center;
+  border-color: var(--border);
+  font-size: 10px;
+  color: var(--muted);
+}
+.lb-side {
+  padding: 20px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.lb-author {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.lb-author .avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+.lb-author .who b {
+  display: block;
+  font-size: 14px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.lb-author .who b:hover {
+  color: var(--accent);
+}
+.lb-author .who span {
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lb-author .who span:hover {
+  color: var(--accent);
+}
+.lb-text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lb-text a,
+.lb-quote a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.lb-text a:hover,
+.lb-quote a:hover {
+  text-decoration: underline;
+}
+.lb-date {
+  align-self: flex-start;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+.lb-date:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.lb-date:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.lb-actions {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--grid);
+}
+.lb-actions a,
+.lb-actions button {
+  font: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.lb-actions a.primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.lb-actions[hidden],
+.lb-actions button[hidden] {
+  display: none;
+}
+.lb-actions button.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+.lb-actions button.danger:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.lb-actions .iconbtn {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.lb-actions .iconbtn svg {
+  width: 15px;
+  height: 15px;
+}
+.lb-actions .iconbtn:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.lb-confirm {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.lb-confirm .crow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lb-confirm .crow button {
+  flex: 1;
+  white-space: nowrap;
+}
+.lb-confirm .chead {
+  justify-content: space-between;
+}
+.lb-confirm .chead button {
+  flex: none;
+}
+.lb-confirm .cq {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.lb-confirm .quiet {
+  border-color: transparent;
+  color: var(--muted);
+}
+.lb-confirm .quiet:hover {
+  color: var(--ink);
+}
+.lb-nav {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 60;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 17px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.lb-nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lb-nav.prev {
+  left: 16px;
+}
+.lb-nav.next {
+  right: 16px;
+}
+.lb-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 60;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* ---- Narrow screens ----
+   The rules above assume room for several columns and a mouse; this is
+   the one place that stops assuming either. */
+@media (max-width: 720px) {
+  main {
+    padding: calc(16px + env(safe-area-inset-top)) 12px
+      calc(56px + env(safe-area-inset-bottom));
+  }
+
+  /* Title, account and menu share the top line. Unwrapping .headright
+     lets the alert — the only thing left in the stat line — order itself
+     onto a line of its own underneath, on the rare occasion there is one. */
+  header.page {
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  header.page h1 {
+    font-size: 18px;
+  }
+  .headright {
+    display: contents;
+  }
+  .brandrow {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .menu {
+    order: 2;
+    margin-left: auto;
+  }
+  .statline {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .menupop {
+    max-width: calc(100vw - 24px);
+  }
+
+  /* Drop the bar's own box so the row inside it sticks to the page
+     rather than to the bar: a sticky element travels only as far as its
+     parent's box, and the bar is barely taller than the row itself. */
+  .bar {
+    display: contents;
+  }
+  .search {
+    max-width: none;
+    margin-bottom: 8px;
+  }
+  /* Anything under 16px makes iOS Safari zoom the page in on focus. */
+  .search input {
+    font-size: 16px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  /* Only the filters stay pinned, on one row: search and the header
+     scroll away, so the strip that follows you down a long archive is
+     about 44px tall instead of the whole top of the page. */
+  .barrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: env(safe-area-inset-top);
+    z-index: 20;
+    margin: 0 -12px 10px;
+    padding: 8px 12px;
+    background: color-mix(in srgb, var(--page) 92%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    transition:
+      translate 0.2s ease,
+      opacity 0.2s ease;
+  }
+  /* Reading down a long archive, even the one pinned row is in the way;
+     it slides off until the first scroll back up asks for it. */
+  body.scrolldown .barrow {
+    translate: 0 calc(-100% - env(safe-area-inset-top) - 1px);
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* Basis 0 keeps the tabs from forcing the sort onto its own line; the
+     overflow they would have caused scrolls sideways instead. */
+  .tabs {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .selwrap {
+    flex: none;
+    margin-left: 0;
+  }
+
+  /* Tighter gutter buys a second column; colCount() reads it back. */
+  #grid,
+  #grid .gcol {
+    gap: 10px;
+  }
+
+  /* Drop the proportion bars: the counts say the same thing and the
+     labels need the width more than the comparison does. */
+  .srow .strack {
+    display: none;
+  }
+  .srow.author {
+    grid-template-columns: 20px minmax(0, 1fr) 48px;
+  }
+  .srow.plain {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+  .dlfile {
+    grid-template-columns: minmax(0, 1fr) 56px 44px;
+  }
+  .field label {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .field input[type="text"] {
+    min-width: 0;
+  }
+
+  /* The lightbox is the feed instead; see "Mobile feed" below. */
+}
+
+/* ---- Mobile feed ----
+   The narrow-screen lightbox: one bookmark per screen, snapped to the
+   viewport, the tweet overlaid on its media. Scripting adds .feed only
+   when the narrow breakpoint matches, so none of this reaches the
+   desktop panel and none of it needs a media query of its own. */
+#lb.feed {
+  padding: 0;
+}
+#lb.feed .lb-panel {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  background: #000;
+}
+/* The single-media box (carousel arrows and all) and the prev/next pair
+   are the panel's way of navigating; the feed just scrolls. */
+#lb.feed .lb-media,
+#lb.feed .lb-nav {
+  display: none;
+}
+.lb-feed {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.lb-feed::-webkit-scrollbar {
+  display: none;
+}
+.lb-pane {
+  position: relative;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+  /* Panning and pinch still work; this only takes double-tap zoom out of
+     the browser's hands, which the double-tap seek needs. */
+  touch-action: manipulation;
+  /* stop: always keeps a fast flick from skipping past bookmarks. */
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+/* A tweet's own media sits on a horizontal track, so a sideways swipe
+   moves through the set while a vertical one moves to the next tweet. */
+.lb-track {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.lb-track::-webkit-scrollbar {
+  display: none;
+}
+.lb-slide {
+  flex: none;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  scroll-snap-align: center;
+}
+.lb-slide img,
+.lb-slide video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.lb-slide .pending {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+}
+.lb-slide .lb-quote {
+  padding: 32px 24px;
+  font-size: 18px;
+  line-height: 1.55;
+  color: #fff;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 100%;
+}
+.lb-dots {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.lb-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}
+.lb-dots span.on {
+  background: #fff;
+}
+
+/* A hairline of progress along the bottom edge, for when the tweet is
+   down — the only thing besides the author that rides over the video.
+   The control row's own rail stands in for it once the tweet is up. */
+.lb-bar {
+  display: none;
+}
+#lb.feed.hasvideo:not(.chrome) .lb-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: env(safe-area-inset-bottom);
+  z-index: 4;
+  display: block;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+.lb-bar span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* Shown for a moment where a double tap landed, so the jump is legible
+   even with the tweet and its controls hidden. */
+.lb-jump {
+  display: none;
+}
+#lb.feed .lb-jump {
+  position: absolute;
+  top: 50%;
+  z-index: 5;
+  display: block;
+  translate: 0 -50%;
+  padding: 8px 15px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+#lb.feed .lb-jump.back {
+  left: 12%;
+}
+#lb.feed .lb-jump.fwd {
+  right: 12%;
+}
+#lb.feed .lb-jump.on {
+  opacity: 1;
+  transition: none;
+}
+
+/* A still frame with no tweet up looks the same stalled or paused, so
+   a paused video wears a play mark until a tap sets it going again. */
+.lb-pause {
+  display: none;
+}
+#lb.feed.hasvideo.paused .lb-pause {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 24px;
+  text-indent: 4px;
+  pointer-events: none;
+}
+
+/* The one .lb-side follows whichever pane is showing, as an overlay. */
+#lb.feed .lb-side {
+  position: absolute;
+  inset: auto 0 0 0;
+  max-height: 38%;
+  overflow: hidden;
+  gap: 5px;
+  padding: 22px 14px calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(0, 0, 0, 0.45) 45%,
+    rgba(0, 0, 0, 0.76)
+  );
+  /* A swipe that starts down here has to reach the feed underneath, and
+     the author sits exactly where an upward swipe begins — so nothing
+     takes taps until the tweet has been asked for. */
+  pointer-events: none;
+}
+/* The author is all that rides over the video; a tap on the media brings
+   the rest of the tweet up — the way out included — and another sends it
+   back. Collapsing them out of the flow shrinks the gradient with them. */
+#lb.feed:not(.chrome) .lb-text,
+#lb.feed:not(.chrome) .lb-date,
+#lb.feed:not(.chrome) .lb-actions,
+#lb.feed:not(.chrome) .lb-close {
+  display: none;
+}
+#lb.feed.chrome .lb-progress,
+#lb.feed.chrome .lb-author,
+#lb.feed.chrome .lb-date,
+#lb.feed.chrome .lb-actions {
+  pointer-events: auto;
+}
+
+/* Native controls draw at the foot of the video, which the overlay sits
+   on top of — so the feed brings its own, in the space the overlay has.
+   Shown only once the tweet has been tapped up, and only over a video. */
+.lb-progress {
+  display: none;
+}
+#lb.feed.chrome.hasvideo .lb-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.lb-progress button {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.lb-progress button svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+.lb-progress .wave,
+.lb-progress .slash {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+#lbmute .slash,
+#lbmute.muted .wave {
+  display: none;
+}
+#lbmute.muted .slash {
+  display: block;
+}
+.lb-progress .lbtime {
+  flex: none;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+/* A thin rail in a thumb-sized hit area; touch-action keeps a drag along
+   it seeking instead of scrolling the feed out from under it. */
+.lbtrack {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.lbrail {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.lbfill {
+  position: relative;
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: #fff;
+}
+/* A visible handle, so the rail reads as something to drag. */
+.lbfill::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 11px;
+  height: 11px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #fff;
+}
+#lb.seeking .lbfill::after {
+  transform: scale(1.25);
+}
+/* Every row squeezed onto as few lines as it can manage — whatever the
+   overlay takes, it takes from the video. */
+#lb.feed .lb-author {
+  gap: 7px;
+}
+#lb.feed .lb-author .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+/* Name beside handle rather than stacked above it, and both kept on the
+   one line: display names run long, and a wrapped author row costs
+   another line of video. The name yields first, then the handle. */
+#lb.feed .lb-author {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+#lb.feed .lb-author .who {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+#lb.feed .lb-author .who b,
+#lb.feed .lb-author .who span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#lb.feed .lb-author .who b {
+  display: inline;
+  flex: 0 1 auto;
+  font-size: 13px;
+}
+#lb.feed .lb-author .who span {
+  flex: 0 2 auto;
+  font-size: 12px;
+}
+/* Clamped rather than scrollable: a tall caption must not turn the
+   bottom of the screen into a text scroller. The date opens the tweet
+   on X for anything longer. */
+#lb.feed .lb-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+#lb.feed .lb-date {
+  font-size: 12px;
+}
+/* Over the media there is only one palette, whatever the theme is. */
+#lb.feed .lb-side,
+#lb.feed .lb-text,
+#lb.feed .lb-author .who b {
+  color: #fff;
+}
+#lb.feed .lb-author .who span,
+#lb.feed .lb-date,
+#lb.feed .lb-confirm .cq,
+#lb.feed .lb-confirm .quiet {
+  color: rgba(255, 255, 255, 0.72);
+}
+#lb.feed .lb-text a,
+#lb.feed .lb-quote a {
+  color: #8ab4f8;
+}
+#lb.feed .lb-actions {
+  gap: 6px;
+  padding-top: 7px;
+  border-top: none;
+}
+/* Tighter than the touch sizing above, which is why the id wins. */
+#lb.feed .lb-actions a,
+#lb.feed .lb-actions button {
+  font-size: 12.5px;
+  padding: 6px 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+#lb.feed .lb-actions .iconbtn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+#lb.feed .lb-close {
+  top: calc(10px + env(safe-area-inset-top));
+  right: 10px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ---- Touch ----
+   Pointer-sized hit areas are hard to land with a thumb. Pad the
+   controls out; none of this changes how they read. */
+@media (hover: none) {
+  /* Nothing reveals these, so they stay visible. */
+  .lb-mnav:not(:disabled) {
+    opacity: 1;
+  }
+  .tabs button {
+    padding: 7px 14px;
+  }
+  .menu summary,
+  .acct select,
+  .spback {
+    padding: 7px 14px;
+  }
+  .selwrap select {
+    padding: 8px 30px 8px 14px;
+  }
+  .chip {
+    padding: 5px 6px 5px 12px;
+  }
+  .chip button {
+    padding: 4px 8px;
+  }
+  .lb-actions a,
+  .lb-actions button {
+    padding: 9px 14px;
+  }
+  .lb-actions .iconbtn {
+    width: 38px;
+    height: 38px;
+  }
+  /* A tap leaves :hover stuck on the card it opened. */
+  .mcard:hover {
+    transform: none;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+}
