@@ -1690,6 +1690,29 @@
         transition: none;
       }
 
+      /* A still frame with no tweet up looks the same stalled or paused, so
+         a paused video wears a play mark until a tap sets it going again. */
+      .lb-pause {
+        display: none;
+      }
+      #lb.feed.hasvideo.paused .lb-pause {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        z-index: 5;
+        display: grid;
+        place-items: center;
+        width: 62px;
+        height: 62px;
+        translate: -50% -50%;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.45);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 24px;
+        text-indent: 4px;
+        pointer-events: none;
+      }
+
       /* The one .lb-side follows whichever pane is showing, as an overlay. */
       #lb.feed .lb-side {
         position: absolute;
@@ -1751,6 +1774,25 @@
         border: 1px solid rgba(255, 255, 255, 0.32);
         border-radius: 50%;
         cursor: pointer;
+      }
+      .lb-progress button svg {
+        width: 12px;
+        height: 12px;
+        fill: currentColor;
+      }
+      .lb-progress .wave,
+      .lb-progress .slash {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.3;
+        stroke-linecap: round;
+      }
+      #lbmute .slash,
+      #lbmute.muted .wave {
+        display: none;
+      }
+      #lbmute.muted .slash {
+        display: block;
       }
       .lb-progress .lbtime {
         flex: none;
@@ -2034,6 +2076,7 @@
         <div class="lb-media" id="lbmedia"></div>
         <div class="lb-feed" id="lbfeed" hidden></div>
         <div class="lb-jump" id="lbjump" aria-hidden="true"></div>
+        <div class="lb-pause" aria-hidden="true">▶</div>
         <div class="lb-bar" id="lbbar" aria-hidden="true">
           <span id="lbbarfill"></span>
         </div>
@@ -2045,6 +2088,13 @@
               <span class="lbrail"><span class="lbfill" id="lbfill"></span></span>
             </div>
             <span class="lbtime" id="lbdur">0:00</span>
+            <button id="lbmute" type="button" aria-label="Mute">
+              <svg viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M1.2 4.2h2.2l3.2-2.6v8.8L3.4 7.8H1.2Z" />
+                <path class="wave" d="M8.4 3.7a3.1 3.1 0 0 1 0 4.6" />
+                <path class="slash" d="m8.2 4.4 3 3.2m0-3.2-3 3.2" />
+              </svg>
+            </button>
           </div>
           <div class="lb-author">
             <span class="avatar" id="lbavatar"></span>
@@ -3346,7 +3396,7 @@
           for (const name of CTL_EVENTS)
             ctlVideo.removeEventListener(name, syncControls);
         ctlVideo = null;
-        $("#lb").classList.remove("hasvideo");
+        $("#lb").classList.remove("hasvideo", "paused");
         if (feedObserver) feedObserver.disconnect();
         feedObserver = null;
         feedLive = false;
@@ -3509,10 +3559,16 @@
         return track.children[slideIndex(track)] || track.firstElementChild;
       }
 
+      // Muting is a choice about the room, not the video, so it follows the
+      // reader from pane to pane. Only the muted state carries: unmuting must
+      // not wake the sound a GIF-style video was born without.
+      let feedMuted = false;
+
       function playPane(j) {
         const slide = currentSlide(j);
         const v = slide && slide.querySelector("video");
         if (!v) return;
+        if (feedMuted) v.muted = true;
         // Opening and swiping are user gestures, so sound is usually allowed;
         // where the browser refuses anyway, fall back to a muted play.
         v.play().catch(() => {
@@ -3535,9 +3591,10 @@
       }
 
       /* ---- Tap and double tap ----
-         One tap shows the tweet, two jump the video — so over a video the
-         first tap has to sit out the double-tap window before it acts. Over a
-         photo there is no second meaning, and it acts at once. */
+         Over a video, one tap in the middle plays or pauses and one nearer an
+         edge shows the tweet; two jump the video — so the first tap has to
+         sit out the double-tap window before it acts. Over a photo there is
+         no second meaning, and it acts at once. */
       const DOUBLE_TAP_MS = 260;
       const SEEK_STEP = 10;
       let tapTimer = null;
@@ -3555,10 +3612,21 @@
           seekBy(e.clientX < innerWidth / 2 ? -SEEK_STEP : SEEK_STEP);
           return;
         }
+        const centered =
+          Math.abs(e.clientX - innerWidth / 2) < innerWidth / 4 &&
+          Math.abs(e.clientY - innerHeight / 2) < innerHeight / 4;
         tapTimer = setTimeout(() => {
           tapTimer = null;
-          toggleChrome();
+          if (centered) togglePlay();
+          else toggleChrome();
         }, DOUBLE_TAP_MS);
+      }
+
+      function togglePlay() {
+        const v = ctlVideo;
+        if (!v) return;
+        if (v.paused) v.play().catch(() => {});
+        else v.pause();
       }
 
       function seekBy(step) {
@@ -3582,7 +3650,13 @@
          so the feed carries its own play/pause, elapsed time and seek rail.
          One set, re-pointed at whichever video is showing. */
       let ctlVideo = null;
-      const CTL_EVENTS = ["timeupdate", "play", "pause", "loadedmetadata"];
+      const CTL_EVENTS = [
+        "timeupdate",
+        "play",
+        "pause",
+        "loadedmetadata",
+        "volumechange",
+      ];
 
       function bindControls() {
         const slide = currentSlide(lbIndex);
@@ -3610,6 +3684,7 @@
       function syncControls() {
         const v = ctlVideo;
         $("#lb").classList.toggle("hasvideo", !!v);
+        $("#lb").classList.toggle("paused", !!v && v.paused);
         if (!v || seeking) return;
         const dur = v.duration || 0;
         const at = v.currentTime || 0;
@@ -3618,6 +3693,8 @@
         $("#lbdur").textContent = fmtDuration(dur * 1000);
         $("#lbplay").textContent = v.paused ? "▶" : "❚❚";
         $("#lbplay").setAttribute("aria-label", v.paused ? "Play" : "Pause");
+        $("#lbmute").classList.toggle("muted", v.muted);
+        $("#lbmute").setAttribute("aria-label", v.muted ? "Unmute" : "Mute");
       }
 
       // Dragging drives the rail directly and writes currentTime as it goes:
@@ -3656,10 +3733,10 @@
           $("#lb").classList.remove("seeking");
         });
       }
-      $("#lbplay").addEventListener("click", () => {
+      $("#lbplay").addEventListener("click", togglePlay);
+      $("#lbmute").addEventListener("click", () => {
         if (!ctlVideo) return;
-        if (ctlVideo.paused) ctlVideo.play().catch(() => {});
-        else ctlVideo.pause();
+        feedMuted = ctlVideo.muted = !ctlVideo.muted;
       });
       /* ---- Linkify URLs, @mentions, and #hashtags in tweet text ---- */
       const LINKIFY_RE =
