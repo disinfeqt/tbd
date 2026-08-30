@@ -44,6 +44,7 @@ func registerExploreRoutes() {
 	http.HandleFunc("/api/explore/accounts", handleExploreAccounts)
 	http.HandleFunc("/api/explore/setup", handleExploreSetup)
 	http.HandleFunc("/media/", handleMediaFile)
+	http.HandleFunc("/poster/", handlePoster)
 }
 
 func handleExploreHome(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +61,10 @@ func handleExploreHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleMediaFile(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	// HEAD as well as GET: iOS asks a video's size and type with a HEAD before
+	// it fetches any byte ranges, and a 405 there leaves it with nothing to
+	// draw. http.ServeFile answers one with headers and no body.
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -773,6 +777,11 @@ func handleExploreDeleteTweet(w http.ResponseWriter, r *http.Request) {
 				filesRemoved++
 			} else if !errors.Is(err, fs.ErrNotExist) {
 				logx.Warnf("Failed to delete media file %s: %v", name, err)
+			}
+			// The frame taken from it has nothing left to describe.
+			if err := os.Remove(posterPath(tweet.AccountID, name)); err != nil &&
+				!errors.Is(err, fs.ErrNotExist) {
+				logx.Warnf("Failed to delete poster for %s: %v", name, err)
 			}
 		}
 	}

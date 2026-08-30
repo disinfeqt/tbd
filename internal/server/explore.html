@@ -2103,6 +2103,9 @@
       "use strict";
       const $ = (sel, root) => (root || document).querySelector(sel);
       const fmt = (n) => Number(n).toLocaleString("en-US");
+      // The one definition of "narrow": the stylesheet's breakpoint, so the
+      // layout and the behaviour that depends on it can never disagree.
+      const NARROW = matchMedia("(max-width: 720px)");
 
       function el(tag, cls, text) {
         const n = document.createElement(tag);
@@ -2248,8 +2251,14 @@
       // that does the syncing is behind the one this app ships.
       function setupAlert() {
         if (!setupCache) return "";
-        if (!setupCache.script.installed) return "Userscript not detected";
-        if (setupCache.script.outdated) return "Userscript update available";
+        // A phone is almost never the browser that syncs, so its own view of
+        // the userscript says nothing about whether syncing works — only the
+        // machine running the extension can answer that. Whether the archive
+        // is empty is still worth saying anywhere.
+        if (!NARROW.matches) {
+          if (!setupCache.script.installed) return "Userscript not detected";
+          if (setupCache.script.outdated) return "Userscript update available";
+        }
         if (setupCache.bookmarks === 0) return "Finish setting up";
         return "";
       }
@@ -2405,11 +2414,20 @@
       /* ---- Media helpers ---- */
       // /media/<account>/<file>: each account keeps its own folder, and the
       // same tweet saved by two accounts produces the same file name in both.
-      const mediaSrc = (m) =>
-        "/media/" +
+      const mediaPath = (m) =>
         encodeURIComponent(m.account_id || state.account) +
         "/" +
         encodeURIComponent(m.file);
+      const mediaSrc = (m) => "/media/" + mediaPath(m);
+      // A frame pulled from the file by the local app. iOS draws nothing for a
+      // video it has not played, so this is the only preview a card can count
+      // on there; elsewhere it just saves fetching the video to show one.
+      const posterSrc = (m) => "/poster/" + mediaPath(m);
+      // iOS Safari draws nothing at all for a preload="metadata" video — no
+      // first frame, no poster, just an empty box — until the file plays, and
+      // on a touch screen the hover that would play it never comes. Asking for
+      // the frame a tenth of a second in gives it something to paint at rest.
+      const videoSrc = (m) => mediaSrc(m) + "#t=0.1";
       const isMotion = (m) => m.type === "video" || m.type === "animated_gif";
       function fmtDuration(ms) {
         const total = Math.round(ms / 1000);
@@ -2443,7 +2461,6 @@
       /* ---- Masonry columns ---- */
       let cols = [];
       let cardNodes = [];
-      const NARROW = matchMedia("(max-width: 720px)");
       function colCount() {
         // Phones get a fixed pair: fitting 240px columns would leave one
         // stack of oversized cards, and the same query drives the layout.
@@ -2499,11 +2516,15 @@
           if (lead.file && !lead.missing) {
             if (isMotion(lead)) {
               const v = document.createElement("video");
-              v.src = mediaSrc(lead);
+              v.src = videoSrc(lead);
+              v.poster = posterSrc(lead);
               v.muted = true;
               v.loop = true;
               v.playsInline = true;
-              v.preload = "metadata";
+              // The poster carries the card at rest, so a phone never fetches
+              // the video itself; a mouse still gets its hover preview, which
+              // wants the metadata ready.
+              v.preload = NARROW.matches ? "none" : "metadata";
               c.addEventListener("mouseenter", () => {
                 v.play().catch(() => {});
               });
@@ -3303,6 +3324,8 @@
       // Crossing the breakpoint with the lightbox open rebuilds it in the
       // other mode, on the bookmark that was showing.
       NARROW.addEventListener("change", () => {
+        // The userscript alert appears and disappears across the breakpoint.
+        if (lastStats) renderStatline(lastStats);
         if ($("#lb").classList.contains("open")) openLb(lbIndex);
       });
 
@@ -3657,7 +3680,8 @@
         }
         if (isMotion(item)) {
           const v = document.createElement("video");
-          v.src = mediaSrc(item);
+          v.src = videoSrc(item);
+          v.poster = posterSrc(item);
           v.preload = "metadata";
           v.playsInline = true;
           const gif = item.type === "animated_gif";
@@ -3746,7 +3770,7 @@
           if (item.file && !item.missing) {
             if (isMotion(item)) {
               const v = document.createElement("video");
-              v.src = mediaSrc(item);
+              v.src = videoSrc(item);
               v.muted = true;
               v.playsInline = true;
               v.preload = "metadata";
