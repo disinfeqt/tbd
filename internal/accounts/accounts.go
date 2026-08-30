@@ -86,6 +86,7 @@ func adoptOrphanBookmarks() error {
 		return eris.Wrap(err, "failed to assign existing bookmarks to the legacy account")
 	}
 	logx.Infof("Assigned %d existing bookmarks to a first account — it takes on your X handle the next time you sync", orphans)
+	logx.Warn("If you use more than one X account, sync with the account these bookmarks belong to first — the next account to sync claims all of them")
 
 	return backfillMemberships()
 }
@@ -196,19 +197,16 @@ func upsert(id, handle string, synced bool) (store.AccountModel, error) {
 		if handle != "" && handle != row.Handle {
 			updates["handle"] = handle
 		}
-		if len(updates) == 0 {
-			return row, nil
-		}
-		if err := store.DB.Model(&store.AccountModel{}).Where("id = ?", id).Updates(updates).Error; err != nil {
-			return row, eris.Wrapf(err, "failed to update account %s", id)
-		}
-		if err := refresh(); err != nil {
-			return row, err
-		}
-		if synced {
-			if err := adoptLegacyInto(id, handle); err != nil {
+		if len(updates) > 0 {
+			if err := store.DB.Model(&store.AccountModel{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+				return row, eris.Wrapf(err, "failed to update account %s", id)
+			}
+			if err := refresh(); err != nil {
 				return row, err
 			}
+		}
+		if err := settle(id, handle, synced); err != nil {
+			return row, err
 		}
 		row, _ = Get(id)
 		return row, nil
@@ -236,13 +234,30 @@ func upsert(id, handle string, synced bool) (store.AccountModel, error) {
 	if err := refresh(); err != nil {
 		return row, err
 	}
-	if synced {
-		if err := adoptLegacyInto(id, handle); err != nil {
-			return row, err
-		}
+	if err := settle(id, handle, synced); err != nil {
+		return row, err
 	}
 	row, _ = Get(id)
 	return row, nil
+}
+
+// settle runs the adoptions an account is due once its row is current: a
+// "@handle" archive recorded while the twid cookie was unreadable folds into
+// the real id whenever the two meet, and a real sync claims the legacy archive.
+func settle(id, handle string, synced bool) error {
+	if id != LegacyID && handle != "" && id != "@"+handle {
+		adopted, err := adoptArchive("@"+handle, id)
+		if err != nil {
+			return err
+		}
+		if adopted {
+			logx.Infof("Merged the archive recorded as @%s into its account id", handle)
+		}
+	}
+	if synced {
+		return adoptLegacyInto(id, handle)
+	}
+	return nil
 }
 
 // adoptLegacyInto hands the pre-accounts archive to the first account that
@@ -251,39 +266,76 @@ func adoptLegacyInto(id, handle string) error {
 	if id == LegacyID {
 		return nil
 	}
-	legacy, ok := Get(LegacyID)
+	adopted, err := adoptArchive(LegacyID, id)
+	if err != nil {
+		return err
+	}
+	if adopted && handle != "" {
+		logx.Infof("Your existing bookmarks now belong to @%s", handle)
+	}
+	return nil
+}
+
+// adoptArchive moves everything fromID holds — bookmarks, memberships, and the
+// media folder they were downloaded into — to toID, then removes fromID.
+// Reports whether this call did the adoption.
+func adoptArchive(fromID, toID string) (bool, error) {
+	if fromID == toID || toID == "" {
+		return false, nil
+	}
+	from, ok := Get(fromID)
 	if !ok {
-		return nil
+		return false, nil
 	}
 
+	adopted := false
 	err := store.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&store.TweetModel{}).Where("account_id = ?", LegacyID).
-			Update("account_id", id).Error; err != nil {
+		// Deleting the adopted account first makes the adoption atomic: of two
+		// concurrent syncs, only the one whose delete lands runs the moves, so
+		// the other cannot re-adopt or clobber the winner's settings.
+		res := tx.Delete(&store.AccountModel{}, "id = ?", fromID)
+		if res.Error != nil {
+			return eris.Wrap(res.Error, "failed to remove the adopted account")
+		}
+		if res.RowsAffected == 0 {
+			return nil // another sync adopted it first
+		}
+		adopted = true
+
+		var owned int64
+		if err := tx.Model(&store.TweetModel{}).Where("account_id = ?", toID).
+			Count(&owned).Error; err != nil {
+			return eris.Wrap(err, "failed to count the adopter's bookmarks")
+		}
+		if err := tx.Model(&store.TweetModel{}).Where("account_id = ?", fromID).
+			Update("account_id", toID).Error; err != nil {
 			return eris.Wrap(err, "failed to move existing bookmarks to the new account")
 		}
-		if err := tx.Model(&store.AccountBookmarkModel{}).Where("account_id = ?", LegacyID).
-			Update("account_id", id).Error; err != nil {
+		// Both accounts may hold the same tweet; the adopter's row wins then.
+		if err := tx.Exec("UPDATE OR IGNORE account_bookmarks SET account_id = ? WHERE account_id = ?",
+			toID, fromID).Error; err != nil {
 			return eris.Wrap(err, "failed to move existing bookmark memberships")
 		}
-		// Keep the folder those files are already in — moving thousands of them
-		// is never worth the risk, and the account can be pointed elsewhere later.
-		if err := tx.Model(&store.AccountModel{}).Where("id = ?", id).
-			Update("media_dir", legacy.MediaDir).Error; err != nil {
-			return eris.Wrap(err, "failed to keep the existing media folder")
+		if err := tx.Exec("DELETE FROM account_bookmarks WHERE account_id = ?", fromID).Error; err != nil {
+			return eris.Wrap(err, "failed to drop duplicate bookmark memberships")
 		}
-		if err := tx.Delete(&store.AccountModel{}, "id = ?", LegacyID).Error; err != nil {
-			return eris.Wrap(err, "failed to remove the legacy account")
+		// Keep the folder those files are already in — moving thousands of them
+		// is never worth the risk. Only a fresh adopter takes the folder over;
+		// one that already owns bookmarks keeps the folder those live in.
+		if owned == 0 {
+			if err := tx.Model(&store.AccountModel{}).Where("id = ?", toID).
+				Update("media_dir", from.MediaDir).Error; err != nil {
+				return eris.Wrap(err, "failed to keep the existing media folder")
+			}
 		}
 		return nil
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
-
-	if handle != "" {
-		logx.Infof("Your existing bookmarks now belong to @%s", handle)
-	}
-	return refresh()
+	// Refresh either way: a lost race means the cache still names the account
+	// the winner just deleted.
+	return adopted, refresh()
 }
 
 // Update changes an account's settings. Nil fields are left as they are.

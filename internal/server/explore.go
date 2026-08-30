@@ -580,11 +580,27 @@ func handleExploreMissing(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Media folder is not accessible", http.StatusInternalServerError)
 		return
 	}
+	// Shared bookmarks live in their owning account's folder, which can be a
+	// different one — and equally unreachable. Check each folder once; files
+	// in an unreachable folder cannot be proven gone.
+	dirOK := map[string]bool{}
+	dirAccessible := func(dir string) bool {
+		ok, seen := dirOK[dir]
+		if !seen {
+			info, err := os.Stat(dir)
+			ok = err == nil && info.IsDir()
+			dirOK[dir] = ok
+		}
+		return ok
+	}
 
 	items := []exploreTweetItem{}
 	for i := range tweets {
 		item := exploreItemFromTweet(&tweets[i])
 		mediaDir := accounts.MediaDir(tweets[i].AccountID)
+		if !dirAccessible(mediaDir) {
+			continue
+		}
 		verified := false
 		present := false
 		for j := range item.Media {

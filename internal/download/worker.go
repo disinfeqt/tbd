@@ -130,8 +130,12 @@ func shouldDownload(media store.MediaModel, videos, images bool) bool {
 // pendingQuery narrows to media still worth fetching. Each account decides what
 // it downloads, so the filter follows the media back to the account that owns
 // its tweet; COALESCE covers rows whose account predates the accounts table and
-// falls back to the global defaults. Unknown media types stay in — the precise
-// call is ShouldDownloadFor, and this only has to avoid excluding work.
+// falls back to the global defaults. The filter has to mirror ShouldDownloadFor
+// exactly: a row this query returns but the worker refuses would come back in
+// every Limit(5) batch and silently starve the whole queue. For unknown types
+// that means the same URL check — .mp4 files follow the video switch,
+// everything else the image switch, and a row with no type and no URL is
+// undownloadable and stays out.
 func pendingQuery() *gorm.DB {
 	current := config.Current()
 
@@ -143,8 +147,13 @@ func pendingQuery() *gorm.DB {
 			WHERE tweets.id = media.tweet_id AND (
 				(media.type = 'photo' AND COALESCE(accounts.download_images, ?) = 1)
 				OR (media.type IN ('video', 'animated_gif') AND COALESCE(accounts.download_videos, ?) = 1)
-				OR media.type NOT IN ('photo', 'video', 'animated_gif')
-			))`, current.DownloadImages, current.DownloadVideos)
+				OR (media.type NOT IN ('photo', 'video', 'animated_gif')
+					AND NOT (media.type = '' AND media.url = '')
+					AND CASE WHEN media.url LIKE '%.mp4' OR media.url LIKE '%.mp4?%'
+						THEN COALESCE(accounts.download_videos, ?) = 1
+						ELSE COALESCE(accounts.download_images, ?) = 1 END)
+			))`, current.DownloadImages, current.DownloadVideos,
+			current.DownloadVideos, current.DownloadImages)
 }
 
 // maxConcurrentDownloads keeps small images flowing while a large video downloads,

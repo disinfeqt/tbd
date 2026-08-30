@@ -1,133 +1,143 @@
 # TBD
 
-把 X/Twitter 书签同步到本地，并下载书签里的媒体文件。
+**English** | [中文](./README.zh-CN.md)
 
-原始 repo：[0x1b2c/twitter-bookmarks-downloader](https://github.com/0x1b2c/twitter-bookmarks-downloader)
+Sync your X/Twitter bookmarks to your own machine and download the media files in them.
 
-## 工作原理
+> **Upgrading from an older version?**
+>
+> - Delete the old Tampermonkey script "Twitter Bookmarks Sync to Local". The script was renamed, so Tampermonkey keeps both and runs them side by side; the service ignores the old script's duplicate batches and warns in the log, but removing it is the clean fix.
+> - If you use several X accounts in this browser, do the first sync after upgrading with the account that owns your existing bookmarks — the first account to sync claims them.
 
-TBD 由两部分组成：
+## How it works
 
-| 组件                    | 作用                                                                   |
-| ----------------------- | ---------------------------------------------------------------------- |
-| 本地 Go 服务（`./tbd`） | 保存书签到 `bookmarks.db`，下载媒体到各账号自己的目录，并提供浏览、统计与设置仪表盘 |
-| Tampermonkey 用户脚本   | 在 `x.com/i/history` 页面捕获浏览器收到的书签数据并发送给本地服务      |
+TBD has two parts:
 
-## 快速开始
+| Component                   | What it does                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Local Go service (`./tbd`)  | Saves bookmarks to `bookmarks.db`, downloads media into each account's own folder, and serves the browse/stats/settings dashboard |
+| Tampermonkey userscript     | Captures the bookmark data the browser receives on `x.com/i/history` and sends it to the local service              |
 
-### 1. 编译并启动本地服务
+## Quick start
 
-先安装 [Go](https://go.dev/dl/)，然后在项目目录运行：
+### 1. Build and start the local service
+
+Install [Go](https://go.dev/dl/), then run in the project directory:
 
 ```bash
 go build -o tbd ./cmd/tbd
 ./tbd
 ```
 
-服务会监听 `http://localhost:41008`。使用时保持这个终端窗口运行。
+The service listens on `http://localhost:41008`. Keep this terminal window running while you use it.
 
-### 2. 安装 Tampermonkey 脚本
+### 2. Install the Tampermonkey script
 
-打开 <http://localhost:41008>，首次运行（还没有任何书签时）会直接进入 **Set up** 引导页，按上面三步做即可：
+Open <http://localhost:41008>. On a first run (before any bookmarks exist) it lands directly on the **Set up** guide — just follow its three steps:
 
-1. 安装 [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) 浏览器扩展
-2. 在 Tampermonkey 设置页启用 **Allow User Scripts**（必须打开，否则脚本不会运行）
-3. 点引导页里的 **Install the script** —— 它指向本地服务提供的 <http://localhost:41008/tbd.user.js>，Tampermonkey 会弹出安装确认
+1. Install the [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) browser extension
+2. Enable **Allow User Scripts** in Tampermonkey's settings (required — nothing runs without it)
+3. Click **Install the script** in the guide — it points at <http://localhost:41008/tbd.user.js>, served by the local app, and Tampermonkey opens its install prompt
 
-引导页会实时显示脚本有没有连上、版本是不是最新；脚本比服务自带的旧时会提示重新安装（同一个链接即可更新）。也可以照旧手动复制 [web/tbd.user.js](./web/tbd.user.js) 的内容新建脚本。
+The guide shows live whether the script has connected and whether it is up to date; when your installed copy is older than the one the app ships, it prompts you to reinstall (the same link updates it). You can also create the script manually by copying the contents of [web/tbd.user.js](./web/tbd.user.js).
 
-### 3. 开始同步
+### 3. Start syncing
 
-保持 `./tbd` 运行，打开：
+With `./tbd` running, open:
 
 ```text
 https://x.com/i/history
 ```
 
-页面左下角会出现 TBD 控制面板，并**自动开始同步**，不需要点任何按钮：
+The TBD panel appears in the bottom-left corner and **syncing starts on its own** — no button press needed:
 
-| 面板内容                   | 含义                                                                                             |
-| -------------------------- | ------------------------------------------------------------------------------------------------ |
-| `N new · M already saved`  | 本次访问新保存了 N 条书签，另有 M 条本地早就有了                                                 |
-| `Start sync` / `Stop sync` | 随时手动停止。连续几批都没有新内容时会自动停止并显示 `All caught up`；再点一次可以继续往更早的书签扫描 |
-| `Download videos` 开关     | 是否下载视频                                                                                     |
-| `Download images` 开关     | 是否下载图片                                                                                     |
+| Panel item                 | Meaning                                                                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `N new · M already saved`  | N bookmarks saved during this visit, with M more already in the local archive                                                |
+| `Start sync` / `Stop sync` | Stop any time. After a few batches with nothing new it stops on its own and shows `All caught up`; press again to keep scanning older bookmarks |
+| `Download videos` switch   | Whether to download videos                                                                                                   |
+| `Download images` switch   | Whether to download images                                                                                                   |
 
-同步结果保存在：
+Sync results are saved to:
 
-- 数据库：`bookmarks.db`
-- 媒体文件：该账号的媒体目录（默认 `media/`）
+- Database: `bookmarks.db`
+- Media files: that account's media folder (default `media/`)
 
-## 多账号
+## Multiple accounts
 
-同一个 TBD 可以归档多个 X 账号，互不干扰：
+One TBD can archive several X accounts without them interfering:
 
-- 脚本会自动识别当前登录的 X 账号（读 `twid` cookie），每批书签都带着账号一起发给本地服务，不需要手动切换
-- 每个账号有自己的书签列表、媒体目录和下载开关
-- 仪表盘左上角出现账号下拉框（有两个及以上账号时），切换后统计、筛选、作者、缺失文件等全部跟着切换
-- 同一条推文被两个账号收藏时，推文只存一份、文件只下载一份，但两个账号都能看到它；从其中一个账号删除不会影响另一个
-- 升级到多账号版本后，原有的书签会先归到一个占位账号，**下一次同步时自动认领为你的真实账号**，媒体目录保持不变，文件不会被移动
+- The script detects which X account is signed in (from the `twid` cookie) and tags every batch with it — no manual switching
+- Each account keeps its own bookmark list, media folder, and download switches
+- An account dropdown appears in the dashboard's top-left corner (once there are two or more accounts); switching it carries the stats, filters, authors, and missing-files views along
+- When two accounts bookmark the same tweet, the tweet is stored once and its files are downloaded once, but both accounts see it; removing it from one account leaves the other untouched
+- After upgrading to the multi-account version, your existing bookmarks are parked under a placeholder account and **claimed automatically by your real account on the next sync** — the media folder stays the same and no files are moved
 
-## 浏览仪表盘
+## Browse dashboard
 
-服务运行时，打开 <http://localhost:41008> 即可浏览整个书签库：
+While the service runs, open <http://localhost:41008> to browse the whole archive:
 
-- **统计**：顶部一行显示书签总数、媒体下载进度、作者数和收藏时间跨度，点击进入对应子页（媒体类型、Top 作者、按月时间线、实时活动日志）
-- **筛选与排序**：全文/作者搜索；类型标签——全部 / 图片（仅纯图片推文，不含图视频混合）/ 视频 / GIF / 文字 / 缺失文件；排序支持按添加时间、推文时间和视频时长
-- **网格**：瀑布流卡片，悬停预览正文，视频卡片显示时长角标
-- **灯箱**：多媒体推文以轮播浏览（缩略图切换 + 键盘左右键），可跳转原推、在 Finder 中显示文件、删除书签（可选同时删除已下载文件）
-- **下载进度**：有媒体在下载时，页面顶部显示实时进度条
-- **设置**：顶部 `Settings` 进入，可为每个账号单独修改媒体目录与视频/图片下载开关，也可以修改「新账号默认值」；`Set up` 是用户脚本的安装与连接状态页
+- **Stats**: one line at the top shows total bookmarks, media download progress, author count, and the time span of your bookmarking; click through to the matching subpages (media types, top authors, monthly timeline, live activity log)
+- **Filter & sort**: full-text/author search; type tabs — All / Photos (photo-only tweets, mixed photo+video excluded) / Videos / GIFs / Text / Missing files; sort by date added, tweet date, or video length
+- **Grid**: masonry cards with hover text preview; video cards carry a duration badge
+- **Lightbox**: multi-media tweets browse as a carousel (thumbnail strip + arrow keys); jump to the original tweet, reveal the file in Finder, or remove the bookmark (optionally deleting its downloaded files)
+- **Download progress**: a live progress strip appears at the top of the page while media is downloading
+- **Settings**: open `Settings` from the top to change each account's media folder and video/image switches, plus the "defaults for new accounts"; `Set up` is the userscript install and connection status page
 
-## 命令行工具
+## Command-line tools
 
-除了默认的服务模式，`./tbd` 还支持以下一次性命令：
+Besides the default service mode, `./tbd` supports these one-shot commands:
 
-| 命令                        | 作用                                                                                                              |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `./tbd --export-handles`    | 导出已保存书签里的唯一作者用户名到 `handles.json`（用 `--handles-output <路径>` 指定输出文件）                    |
-| `./tbd --repair-media`      | 根据数据库里保存的原始推文 JSON 修复视频媒体链接                                                                  |
-| `./tbd --fix-deleted-media` | 以 `media/` 文件夹为准，删除媒体文件已被全部手动删除的书签记录                                                    |
-| `./tbd --reset`             | 确认后删除 `bookmarks.db`（含 WAL 文件）。`media/` 里已下载的媒体**永远不会被删除**。执行前请先停止正在运行的服务 |
+| Command                     | What it does                                                                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `./tbd --export-handles`    | Export the unique author handles from saved bookmarks to `handles.json` (choose the output file with `--handles-output <path>`)               |
+| `./tbd --repair-media`      | Repair video media URLs from the raw tweet JSON stored in the database                                                                        |
+| `./tbd --fix-deleted-media` | Treat the `media/` folder as the source of truth and remove bookmark records whose media files were all deleted by hand                       |
+| `./tbd --reset`             | After confirmation, delete `bookmarks.db` (including WAL files). Downloaded media in `media/` is **never touched**. Stop the running service first |
 
-## 设置
+## Settings
 
-账号级设置存在数据库里，用仪表盘的 `Settings` 页修改最方便；用户脚本面板上的两个开关改的也是当前 X 账号的设置。
+Per-account settings live in the database; the dashboard's `Settings` page is the easiest place to change them. The two switches on the userscript panel also edit the current X account's settings.
 
-`config.json` 保存的是**新账号的默认值**（以及还没有任何账号时的回退值），首次运行服务时生成：
+`config.json` holds the **defaults for new accounts** (and the fallback while no account exists yet), generated on the first run:
 
 ```jsonc
 {
-  // 媒体保存目录：相对路径基于运行 ./tbd 的目录，支持项目外的任意文件夹，
-  // 包括外接硬盘，例如 "/Volumes/Archive/x-media"；
+  // Media folder: a relative path resolves against the directory ./tbd runs
+  // in; any folder outside the project works too, including external drives,
+  // e.g. "/Volumes/Archive/x-media";
   "media_dir": "media",
   "download_videos": true,
   "download_images": true,
 }
 ```
 
-## 常见问题
+## FAQ
 
-**装完脚本但仪表盘说没连上？**
+**Installed the script but the dashboard says it hasn't connected?**
 
-脚本只有在 x.com 页面加载时才会联系本地服务，所以刚装完先打开一次 x.com。`Set up` 页每几秒自动刷新一次状态，连上后会变成绿点。
+The script only contacts the local service when an x.com page loads, so open x.com once right after installing. The `Set up` page refreshes its status every few seconds and shows a green dot once connected.
 
-**页面左下角没有控制面板？**
+**No panel in the bottom-left corner?**
 
-依次检查：Tampermonkey 扩展已启用、脚本已启用、Tampermonkey 设置里的 **Allow User Scripts** 已开启、当前页面是 `https://x.com/i/history`（旧地址 `https://x.com/i/bookmarks` 也支持）。
+Check in order: the Tampermonkey extension is enabled, the script is enabled, **Allow User Scripts** is on in Tampermonkey's settings, and the page is `https://x.com/i/history` (the old address `https://x.com/i/bookmarks` works too).
 
-**刚加的书签没有被同步到？**
+**A bookmark you just added isn't syncing?**
 
-新书签只会出现在时间线顶部，而 X 在站内跳转时会直接复用缓存的时间线、根本不发请求。脚本发现页面在几秒内没有任何书签请求时会自动刷新一次页面再开始同步，所以正常情况下不需要手动刷新。
+New bookmarks only appear at the top of the timeline, and X reuses a cached timeline on in-app navigation without making any request. When the script sees no bookmark request within a few seconds, it reloads the page once on its own before syncing — so normally no manual reload is needed.
 
-**有待下载数量，但暂时看不到新文件？**
+**Downloads pending but no new files appearing yet?**
 
-大视频下载需要时间。服务会在终端显示开始下载和进度；如果没有这些日志，重启 `./tbd`。
+Large videos take time. The service logs download starts and progress in the terminal; if those logs are absent, restart `./tbd`.
 
-**更新脚本后没有生效？**
+**Updated the script but nothing changed?**
 
-回到 Tampermonkey，把 [web/tbd.user.js](./web/tbd.user.js) 的最新内容重新复制进去并保存。
+Reopen <http://localhost:41008/tbd.user.js> and let Tampermonkey reinstall over it (or re-copy the latest contents of [web/tbd.user.js](./web/tbd.user.js) and save). Also make sure the old script "Twitter Bookmarks Sync to Local" is deleted — it is a separate entry and runs alongside the new one.
 
-## 许可证
+## License
 
-MIT。仅用于个人归档，请自行遵守 X/Twitter 的服务条款和内容版权要求。
+MIT. For personal archiving only — you are responsible for complying with X/Twitter's terms of service and content copyright.
+
+## Thanks
+
+TBD grew out of [0x1b2c/twitter-bookmarks-downloader](https://github.com/0x1b2c/twitter-bookmarks-downloader) — thanks to the original author for the foundation this project is built on.

@@ -15,13 +15,17 @@ import (
 )
 
 type accountView struct {
-	ID             string     `json:"id"`
-	Handle         string     `json:"handle"`
-	MediaDir       string     `json:"media_dir"`
-	DownloadVideos bool       `json:"download_videos"`
-	DownloadImages bool       `json:"download_images"`
-	Bookmarks      int64      `json:"bookmarks"`
-	LastSyncAt     *time.Time `json:"last_sync_at"`
+	ID     string `json:"id"`
+	Handle string `json:"handle"`
+	// MediaDir is the stored setting — empty means "follow the global default".
+	// MediaDirResolved is where files actually land right now; the settings
+	// form must edit the stored value, or one save would pin the default.
+	MediaDir         string     `json:"media_dir"`
+	MediaDirResolved string     `json:"media_dir_resolved"`
+	DownloadVideos   bool       `json:"download_videos"`
+	DownloadImages   bool       `json:"download_images"`
+	Bookmarks        int64      `json:"bookmarks"`
+	LastSyncAt       *time.Time `json:"last_sync_at"`
 }
 
 // accountViews lists every account with the size of its archive, newest sync
@@ -46,13 +50,14 @@ func accountViews() ([]accountView, error) {
 	views := make([]accountView, 0, len(rows))
 	for _, row := range rows {
 		views = append(views, accountView{
-			ID:             row.ID,
-			Handle:         row.Handle,
-			MediaDir:       accounts.MediaDir(row.ID),
-			DownloadVideos: row.DownloadVideos,
-			DownloadImages: row.DownloadImages,
-			Bookmarks:      byAccount[row.ID],
-			LastSyncAt:     nonZeroTime(row.LastSyncAt),
+			ID:               row.ID,
+			Handle:           row.Handle,
+			MediaDir:         row.MediaDir,
+			MediaDirResolved: accounts.MediaDir(row.ID),
+			DownloadVideos:   row.DownloadVideos,
+			DownloadImages:   row.DownloadImages,
+			Bookmarks:        byAccount[row.ID],
+			LastSyncAt:       nonZeroTime(row.LastSyncAt),
 		})
 	}
 	return views, nil

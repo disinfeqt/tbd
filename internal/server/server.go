@@ -5,6 +5,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/rotisserie/eris"
 
@@ -35,6 +36,17 @@ func writeJSON(w http.ResponseWriter, payload any) {
 func handleSyncRaw(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Tampermonkey treats the renamed script as a new one, so the old
+	// "Twitter Bookmarks Sync to Local" keeps running beside it, re-posting
+	// every batch with no version and no account header. Once the current
+	// script has been seen, drop those copies: they would be filed under
+	// whichever account synced last.
+	if strings.TrimSpace(r.Header.Get("X-TBD-Version")) == "" && knownScriptVersion() != "" {
+		logx.Warn(`Ignored a batch from the old userscript — remove "Twitter Bookmarks Sync to Local" from Tampermonkey; TBD's own script replaces it`)
+		writeJSON(w, syncer.SyncResponse{Success: false, Message: "Old userscript ignored — remove it from Tampermonkey"})
 		return
 	}
 

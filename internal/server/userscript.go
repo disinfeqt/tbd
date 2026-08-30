@@ -20,6 +20,14 @@ var (
 	scriptVersion string
 )
 
+// knownScriptVersion is the version of the newest script that has called in
+// since TBD started; empty until one does.
+func knownScriptVersion() string {
+	scriptMu.RLock()
+	defer scriptMu.RUnlock()
+	return scriptVersion
+}
+
 // noteUserscript records a call from the userscript and returns the account the
 // request belongs to. An unidentified call falls back to the most recently
 // synced account so a script too old to send its account still works.

@@ -1690,6 +1690,7 @@
         state.account = id;
         statsCache = null;
         authorsCache = null;
+        state.counts = null; // tab counts (incl. Missing) belong to the old account
         clearFilters();
         loadStats().catch(() => {});
         setView("grid");
@@ -1736,7 +1737,10 @@
       let lastStats = null;
 
       async function loadStats() {
-        const stats = await ensureStats();
+        renderStatline(await ensureStats());
+      }
+
+      function renderStatline(stats) {
         lastStats = stats;
 
         const line = $("#statline");
@@ -2343,6 +2347,9 @@
       async function renderSetup(body) {
         const data = await loadSetup(true);
         const script = data.script || {};
+        // The header chip and menu badge derive from setupCache too — recompute
+        // them from this fresh copy so "not detected" clears once it connects.
+        if (lastStats) renderStatline(lastStats);
         body.textContent = "";
 
         const head = el("div", "panel");
@@ -2434,7 +2441,7 @@
                   " — " +
                   fmt(account.bookmarks) +
                   " bookmarks in " +
-                  account.media_dir,
+                  (account.media_dir_resolved || account.media_dir || "media"),
               ),
             );
           }
@@ -2486,8 +2493,10 @@
         field.append(el("label", "", "Media folder"));
         const input = el("input");
         input.type = "text";
+        // The stored value, not the resolved one: an account left empty follows
+        // the global default, and saving the resolved path back would pin it.
         input.value = values.media_dir || "";
-        input.placeholder = "media";
+        input.placeholder = values.media_dir_resolved || "media";
         field.append(input);
         const saveBtn = el("button", "btn quiet", "Save");
         saveBtn.addEventListener("click", () =>
@@ -3117,6 +3126,17 @@
           // Queue just drained — refresh the header stats.
           statsCache = null;
           loadStats().catch(() => {});
+        }
+        // A setup warning resolves in another tab (installing the script, the
+        // first sync); while one shows, re-check on the idle cadence so the
+        // chip can clear itself instead of outliving the problem.
+        if (!busy && setupCache && setupAlert()) {
+          const before = setupAlert();
+          try {
+            await loadSetup(true);
+            if (setupAlert() !== before && lastStats)
+              renderStatline(lastStats);
+          } catch {}
         }
         dlWasBusy = busy;
         clearTimeout(dlTimer);

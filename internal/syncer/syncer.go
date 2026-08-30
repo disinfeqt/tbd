@@ -287,8 +287,14 @@ func processRawTweetResults(results []json.RawMessage, accountID string) SyncRes
 			mine[pt.id] = struct{}{} // A repeated ID later in this batch is a duplicate.
 
 			// Another account already archived the tweet, so the row and its files
-			// stay put; this account simply gained a bookmark.
+			// stay put; this account simply gained a bookmark. Repair any media
+			// records the row is missing, same as the duplicate path does.
 			if _, alreadyStored := stored[pt.id]; alreadyStored {
+				if backfilled, err := createMissingMedia(tx, pt.id, pt.media); err != nil {
+					logx.Error(err)
+				} else if backfilled > 0 {
+					logx.Infof("Backfilled %d media records for existing tweet %s", backfilled, pt.id)
+				}
 				savedCount++
 				continue
 			}

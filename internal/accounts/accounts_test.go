@@ -53,6 +53,66 @@ func TestLegacyArchiveIsAdoptedOnFirstSync(t *testing.T) {
 	assert.Empty(t, adopter.MediaDir)
 }
 
+// Losing the adoption race must be a no-op. The loser's cache still names the
+// legacy account, but the row is gone — re-running the moves would clobber the
+// winner's settings, most damagingly its media folder.
+func TestAdoptArchiveLostRaceIsNoOp(t *testing.T) {
+	freshDB(t)
+	require.NoError(t, store.DB.Create(&store.TweetModel{ID: "t1", ScreenName: "alice"}).Error)
+	require.NoError(t, Load())
+
+	_, err := Touch("555", "winner")
+	require.NoError(t, err) // adopts the legacy archive
+
+	// The loser raced: its cache still held the legacy account when it called
+	// in. Re-seed the cache with that stale copy and try to adopt again.
+	mu.Lock()
+	cached[LegacyID] = store.AccountModel{ID: LegacyID, MediaDir: "stale-dir"}
+	mu.Unlock()
+
+	adopted, err := adoptArchive(LegacyID, "555")
+	require.NoError(t, err)
+	assert.False(t, adopted)
+
+	row, ok := Get("555")
+	require.True(t, ok)
+	assert.Empty(t, row.MediaDir, "a lost race must not clobber the media folder")
+	_, stillCached := Get(LegacyID)
+	assert.False(t, stillCached, "the stale cache entry is cleared")
+}
+
+// An archive recorded under "@handle" (the twid cookie was unreadable) folds
+// into the real account id as soon as the two meet, so one person never ends
+// up split across two accounts.
+func TestHandleAliasFoldsIntoRealID(t *testing.T) {
+	freshDB(t)
+	require.NoError(t, Load())
+
+	_, err := Touch("@carol", "carol")
+	require.NoError(t, err)
+	require.NoError(t, store.DB.Create(&store.TweetModel{ID: "t9", AccountID: "@carol", ScreenName: "x"}).Error)
+	require.NoError(t, store.DB.Create(&store.AccountBookmarkModel{AccountID: "@carol", TweetID: "t9"}).Error)
+
+	_, err = Touch("999", "carol")
+	require.NoError(t, err)
+
+	_, aliasLeft := Get("@carol")
+	assert.False(t, aliasLeft, "the alias account is gone after the merge")
+
+	var tweet store.TweetModel
+	require.NoError(t, store.DB.First(&tweet, "id = ?", "t9").Error)
+	assert.Equal(t, "999", tweet.AccountID)
+
+	var membership store.AccountBookmarkModel
+	require.NoError(t, store.DB.First(&membership, "tweet_id = ?", "t9").Error)
+	assert.Equal(t, "999", membership.AccountID)
+
+	// The files stay findable: the fresh account takes over the alias's folder.
+	row, ok := Get("999")
+	require.True(t, ok)
+	assert.Equal(t, DefaultMediaDirFor("carol"), row.MediaDir)
+}
+
 // Settings a user turned off have to stay off; a gorm default once quietly
 // flipped them back on at insert time.
 func TestNewAccountKeepsDisabledDownloads(t *testing.T) {

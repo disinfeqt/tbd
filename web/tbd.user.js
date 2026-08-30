@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TBD
 // @namespace    https://github.com/disinfeqt/tbd
-// @version      1.0
+// @version      1.1
 // @description  Intercept X's bookmark responses, sync them to the local TBD app, and auto-scroll for more.
 // @author       disinfeqt
 // @match        https://x.com/*
@@ -19,7 +19,7 @@
   const SCRIPT_VERSION =
     typeof GM_info !== "undefined" && GM_info.script
       ? GM_info.script.version
-      : "1.0";
+      : "1.1";
   const RAW_SYNC_URL = "http://localhost:41008/api/sync-raw";
   const SETTINGS_URL = "http://localhost:41008/api/settings";
   // Tampermonkey shows its install prompt for a .user.js URL, so the notice can
@@ -573,29 +573,22 @@
       });
     },
 
+    // Send only the toggled key: the server patches what is present, and
+    // echoing media_dir back would pin the resolved default onto an account
+    // that is meant to keep following it.
     toggleVideos() {
-      const next = {
-        media_dir: this.settings.media_dir,
-        download_videos: !this.settings.download_videos,
-        download_images: this.settings.download_images !== false,
-      };
-
+      const on = !this.settings.download_videos;
       this.saveSettings(
-        next,
-        next.download_videos ? "Video downloads on" : "Video downloads off",
+        { download_videos: on },
+        on ? "Video downloads on" : "Video downloads off",
       );
     },
 
     toggleImages() {
-      const next = {
-        media_dir: this.settings.media_dir,
-        download_videos: this.settings.download_videos !== false,
-        download_images: !this.settings.download_images,
-      };
-
+      const on = !this.settings.download_images;
       this.saveSettings(
-        next,
-        next.download_images ? "Image downloads on" : "Image downloads off",
+        { download_images: on },
+        on ? "Image downloads on" : "Image downloads off",
       );
     },
   };

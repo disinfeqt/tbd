@@ -83,6 +83,12 @@ func TestPendingQueueFollowsAccountSettings(t *testing.T) {
 			Media: []store.MediaModel{
 				{ID: "video-off", TweetID: "t2", Type: "video", URL: "https://video.twimg.com/b.mp4"},
 				{ID: "photo-still-on", TweetID: "t2", Type: "photo", URL: "https://pbs.twimg.com/b.jpg"},
+				// Unknown types must land on the same side of the fence as
+				// ShouldDownloadFor: a row the query returns but the worker
+				// refuses would wedge every Limit(5) batch forever.
+				{ID: "mystery-mp4-off", TweetID: "t2", Type: "mystery", URL: "https://video.twimg.com/c.mp4?tag=1"},
+				{ID: "mystery-img-on", TweetID: "t2", Type: "mystery", URL: "https://pbs.twimg.com/c.bin"},
+				{ID: "untyped-blank", TweetID: "t2", Type: "", URL: ""},
 			},
 		},
 	}
@@ -90,9 +96,13 @@ func TestPendingQueueFollowsAccountSettings(t *testing.T) {
 
 	var queued []string
 	require.NoError(t, pendingQuery().Order("id").Pluck("id", &queued).Error)
-	assert.Equal(t, []string{"photo-on", "photo-still-on", "video-on"}, queued)
+	assert.Equal(t, []string{"mystery-img-on", "photo-on", "photo-still-on", "video-on"}, queued)
 
 	assert.True(t, ShouldDownloadFor("keeps-video", store.MediaModel{Type: "video"}))
 	assert.False(t, ShouldDownloadFor("no-video", store.MediaModel{Type: "video"}))
 	assert.True(t, ShouldDownloadFor("no-video", store.MediaModel{Type: "photo"}))
+	// The query and the worker agree on every unknown-type row above.
+	assert.False(t, ShouldDownloadFor("no-video", store.MediaModel{Type: "mystery", URL: "https://video.twimg.com/c.mp4?tag=1"}))
+	assert.True(t, ShouldDownloadFor("no-video", store.MediaModel{Type: "mystery", URL: "https://pbs.twimg.com/c.bin"}))
+	assert.False(t, ShouldDownloadFor("no-video", store.MediaModel{Type: "", URL: ""}))
 }
