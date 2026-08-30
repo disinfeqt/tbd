@@ -25,6 +25,7 @@ func main() {
 	exportHandles := flag.Bool("export-handles", false, "Export unique @ handles to JSON and exit")
 	handlesOutput := flag.String("handles-output", "handles.json", "Output path for --export-handles")
 	reset := flag.Bool("reset", false, "Delete the bookmarks database and logs after confirmation (media files are never touched) and exit")
+	listen := flag.String("listen", "127.0.0.1:41008", `Address the dashboard listens on; pass ":41008" to reach it from other devices on your network (TBD has no password — trusted networks only)`)
 	flag.Parse()
 
 	// Reset runs before the database is opened, so nothing holds the files
@@ -86,8 +87,9 @@ func main() {
 	// 4. Start Background Download Worker
 	go download.StartWorker()
 
-	// 5. Start HTTP Server (localhost only — the dashboard exposes the whole archive)
-	if err := server.Start("127.0.0.1:41008"); err != nil {
+	// 5. Start HTTP Server (localhost by default — the dashboard exposes the
+	// whole archive and has no password; --listen opens it to the network)
+	if err := server.Start(*listen); err != nil {
 		logx.Fatal(eris.Wrap(err, "Server failed"))
 	}
 }

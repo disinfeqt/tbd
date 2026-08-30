@@ -1566,6 +1566,9 @@
         height: 100%;
         display: flex;
         overflow: hidden;
+        /* Panning and pinch still work; this only takes double-tap zoom out of
+           the browser's hands, which the double-tap seek needs. */
+        touch-action: manipulation;
         /* stop: always keeps a fast flick from skipping past bookmarks. */
         scroll-snap-align: start;
         scroll-snap-stop: always;
@@ -1631,6 +1634,62 @@
         background: #fff;
       }
 
+      /* A hairline of progress along the bottom edge, for when the tweet is
+         down — the only thing besides the author that rides over the video.
+         The control row's own rail stands in for it once the tweet is up. */
+      .lb-bar {
+        display: none;
+      }
+      #lb.feed.hasvideo:not(.chrome) .lb-bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: env(safe-area-inset-bottom);
+        z-index: 4;
+        display: block;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.22);
+        pointer-events: none;
+      }
+      .lb-bar span {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      /* Shown for a moment where a double tap landed, so the jump is legible
+         even with the tweet and its controls hidden. */
+      .lb-jump {
+        display: none;
+      }
+      #lb.feed .lb-jump {
+        position: absolute;
+        top: 50%;
+        z-index: 5;
+        display: block;
+        translate: 0 -50%;
+        padding: 8px 15px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+      }
+      #lb.feed .lb-jump.back {
+        left: 12%;
+      }
+      #lb.feed .lb-jump.fwd {
+        right: 12%;
+      }
+      #lb.feed .lb-jump.on {
+        opacity: 1;
+        transition: none;
+      }
+
       /* The one .lb-side follows whichever pane is showing, as an overlay. */
       #lb.feed .lb-side {
         position: absolute;
@@ -1651,17 +1710,94 @@
         pointer-events: none;
       }
       /* The author is all that rides over the video; a tap on the media brings
-         the rest of the tweet up, another sends it back. Collapsing them out
-         of the flow shrinks the gradient with them. */
+         the rest of the tweet up — the way out included — and another sends it
+         back. Collapsing them out of the flow shrinks the gradient with them. */
       #lb.feed:not(.chrome) .lb-text,
       #lb.feed:not(.chrome) .lb-date,
-      #lb.feed:not(.chrome) .lb-actions {
+      #lb.feed:not(.chrome) .lb-actions,
+      #lb.feed:not(.chrome) .lb-close {
         display: none;
       }
+      #lb.feed.chrome .lb-progress,
       #lb.feed.chrome .lb-author,
       #lb.feed.chrome .lb-date,
       #lb.feed.chrome .lb-actions {
         pointer-events: auto;
+      }
+
+      /* Native controls draw at the foot of the video, which the overlay sits
+         on top of — so the feed brings its own, in the space the overlay has.
+         Shown only once the tweet has been tapped up, and only over a video. */
+      .lb-progress {
+        display: none;
+      }
+      #lb.feed.chrome.hasvideo .lb-progress {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .lb-progress button {
+        flex: none;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        font: inherit;
+        font-size: 10px;
+        line-height: 1;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.32);
+        border-radius: 50%;
+        cursor: pointer;
+      }
+      .lb-progress .lbtime {
+        flex: none;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.75);
+        font-variant-numeric: tabular-nums;
+      }
+      /* A thin rail in a thumb-sized hit area; touch-action keeps a drag along
+         it seeking instead of scrolling the feed out from under it. */
+      .lbtrack {
+        flex: 1;
+        min-width: 0;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        touch-action: none;
+      }
+      .lbrail {
+        position: relative;
+        flex: 1;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.3);
+      }
+      .lbfill {
+        position: relative;
+        display: block;
+        width: 0;
+        height: 100%;
+        border-radius: 2px;
+        background: #fff;
+      }
+      /* A visible handle, so the rail reads as something to drag. */
+      .lbfill::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 100%;
+        width: 11px;
+        height: 11px;
+        margin: -6px 0 0 -6px;
+        border-radius: 50%;
+        background: #fff;
+      }
+      #lb.seeking .lbfill::after {
+        transform: scale(1.25);
       }
       /* Every row squeezed onto as few lines as it can manage — whatever the
          overlay takes, it takes from the video. */
@@ -1673,22 +1809,34 @@
         height: 24px;
         font-size: 11px;
       }
-      /* Name beside handle rather than stacked above it. */
+      /* Name beside handle rather than stacked above it, and both kept on the
+         one line: display names run long, and a wrapped author row costs
+         another line of video. The name yields first, then the handle. */
+      #lb.feed .lb-author {
+        flex-wrap: nowrap;
+        min-width: 0;
+      }
       #lb.feed .lb-author .who {
         display: flex;
         align-items: baseline;
         gap: 6px;
         min-width: 0;
       }
-      #lb.feed .lb-author .who b {
-        display: inline;
-        font-size: 13px;
-      }
+      #lb.feed .lb-author .who b,
       #lb.feed .lb-author .who span {
-        font-size: 12px;
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      #lb.feed .lb-author .who b {
+        display: inline;
+        flex: 0 1 auto;
+        font-size: 13px;
+      }
+      #lb.feed .lb-author .who span {
+        flex: 0 2 auto;
+        font-size: 12px;
       }
       /* Clamped rather than scrollable: a tall caption must not turn the
          bottom of the screen into a text scroller. The date opens the tweet
@@ -1885,7 +2033,19 @@
       <div class="lb-panel">
         <div class="lb-media" id="lbmedia"></div>
         <div class="lb-feed" id="lbfeed" hidden></div>
+        <div class="lb-jump" id="lbjump" aria-hidden="true"></div>
+        <div class="lb-bar" id="lbbar" aria-hidden="true">
+          <span id="lbbarfill"></span>
+        </div>
         <div class="lb-side">
+          <div class="lb-progress" id="lbctl">
+            <button id="lbplay" type="button" aria-label="Pause">❚❚</button>
+            <span class="lbtime" id="lbat">0:00</span>
+            <div class="lbtrack" id="lbseek">
+              <span class="lbrail"><span class="lbfill" id="lbfill"></span></span>
+            </div>
+            <span class="lbtime" id="lbdur">0:00</span>
+          </div>
           <div class="lb-author">
             <span class="avatar" id="lbavatar"></span>
             <span class="who">
@@ -3158,6 +3318,12 @@
       const filledPanes = new Set();
 
       function resetFeed() {
+        cancelTap();
+        if (ctlVideo)
+          for (const name of CTL_EVENTS)
+            ctlVideo.removeEventListener(name, syncControls);
+        ctlVideo = null;
+        $("#lb").classList.remove("hasvideo");
         if (feedObserver) feedObserver.disconnect();
         feedObserver = null;
         feedLive = false;
@@ -3195,7 +3361,7 @@
           pane.dataset.i = String(j);
           // Bound to the pane, not its contents, which are torn down and
           // rebuilt as the reader moves.
-          pane.addEventListener("click", toggleChrome);
+          pane.addEventListener("click", onPaneTap);
           feedPanes.push(pane);
           box.append(pane);
           if (feedLive && feedObserver) feedObserver.observe(pane);
@@ -3232,6 +3398,8 @@
         pausePane(i - 1);
         pausePane(i + 1);
         playPane(i);
+        bindControls();
+        cancelTap();
       }
 
       function fillPane(j) {
@@ -3272,6 +3440,7 @@
             lbMediaIndex = at;
             pausePane(j);
             playPane(j);
+            bindControls();
           },
           { passive: true },
         );
@@ -3317,7 +3486,136 @@
       // the state carries across swipes until it is tapped away again.
       function toggleChrome() {
         $("#lb").classList.toggle("chrome");
+        bindControls();
       }
+
+      /* ---- Tap and double tap ----
+         One tap shows the tweet, two jump the video — so over a video the
+         first tap has to sit out the double-tap window before it acts. Over a
+         photo there is no second meaning, and it acts at once. */
+      const DOUBLE_TAP_MS = 260;
+      const SEEK_STEP = 10;
+      let tapTimer = null;
+      let jumpTimer = null;
+
+      function cancelTap() {
+        clearTimeout(tapTimer);
+        tapTimer = null;
+      }
+
+      function onPaneTap(e) {
+        if (!ctlVideo) return toggleChrome();
+        if (tapTimer) {
+          cancelTap();
+          seekBy(e.clientX < innerWidth / 2 ? -SEEK_STEP : SEEK_STEP);
+          return;
+        }
+        tapTimer = setTimeout(() => {
+          tapTimer = null;
+          toggleChrome();
+        }, DOUBLE_TAP_MS);
+      }
+
+      function seekBy(step) {
+        const v = ctlVideo;
+        if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return;
+        v.currentTime = Math.min(
+          v.duration,
+          Math.max(0, v.currentTime + step),
+        );
+        const jump = $("#lbjump");
+        jump.className = "lb-jump on " + (step < 0 ? "back" : "fwd");
+        jump.textContent =
+          (step < 0 ? "« " : "") + Math.abs(step) + "s" + (step < 0 ? "" : " »");
+        // Held, then faded — and a second jump restarts the hold.
+        clearTimeout(jumpTimer);
+        jumpTimer = setTimeout(() => jump.classList.remove("on"), 400);
+      }
+
+      /* ---- Feed video controls ----
+         Native controls draw at the foot of the video, where the overlay is,
+         so the feed carries its own play/pause, elapsed time and seek rail.
+         One set, re-pointed at whichever video is showing. */
+      let ctlVideo = null;
+      const CTL_EVENTS = ["timeupdate", "play", "pause", "loadedmetadata"];
+
+      function bindControls() {
+        const slide = currentSlide(lbIndex);
+        const v = (slide && slide.querySelector("video")) || null;
+        if (v !== ctlVideo) {
+          if (ctlVideo)
+            for (const name of CTL_EVENTS)
+              ctlVideo.removeEventListener(name, syncControls);
+          ctlVideo = v;
+          if (v)
+            for (const name of CTL_EVENTS)
+              v.addEventListener(name, syncControls);
+        }
+        syncControls();
+      }
+
+      // The control row's rail and the hairline at the bottom edge show the
+      // same thing; only one of them is ever on screen.
+      function paintProgress(frac) {
+        const pct = 100 * Math.min(1, Math.max(0, frac || 0)) + "%";
+        $("#lbfill").style.width = pct;
+        $("#lbbarfill").style.width = pct;
+      }
+
+      function syncControls() {
+        const v = ctlVideo;
+        $("#lb").classList.toggle("hasvideo", !!v);
+        if (!v || seeking) return;
+        const dur = v.duration || 0;
+        const at = v.currentTime || 0;
+        paintProgress(dur ? at / dur : 0);
+        $("#lbat").textContent = fmtDuration(at * 1000);
+        $("#lbdur").textContent = fmtDuration(dur * 1000);
+        $("#lbplay").textContent = v.paused ? "▶" : "❚❚";
+        $("#lbplay").setAttribute("aria-label", v.paused ? "Play" : "Pause");
+      }
+
+      // Dragging drives the rail directly and writes currentTime as it goes:
+      // waiting for the video to report back leaves the handle lagging the
+      // finger, and on a long file it barely moves at all.
+      let seeking = false;
+      function seekTo(e) {
+        const v = ctlVideo;
+        if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return;
+        const rail = $("#lbseek").getBoundingClientRect();
+        const at = Math.min(
+          1,
+          Math.max(0, (e.clientX - rail.left) / (rail.width || 1)),
+        );
+        paintProgress(at);
+        $("#lbat").textContent = fmtDuration(at * v.duration * 1000);
+        v.currentTime = at * v.duration;
+      }
+      $("#lbseek").addEventListener("pointerdown", (e) => {
+        if (!ctlVideo) return;
+        e.preventDefault();
+        seeking = true;
+        $("#lb").classList.add("seeking");
+        // Capture so the drag keeps seeking after the finger leaves the rail.
+        try {
+          $("#lbseek").setPointerCapture(e.pointerId);
+        } catch {}
+        seekTo(e);
+      });
+      $("#lbseek").addEventListener("pointermove", (e) => {
+        if (seeking) seekTo(e);
+      });
+      for (const name of ["pointerup", "pointercancel"]) {
+        $("#lbseek").addEventListener(name, () => {
+          seeking = false;
+          $("#lb").classList.remove("seeking");
+        });
+      }
+      $("#lbplay").addEventListener("click", () => {
+        if (!ctlVideo) return;
+        if (ctlVideo.paused) ctlVideo.play().catch(() => {});
+        else ctlVideo.pause();
+      });
       /* ---- Linkify URLs, @mentions, and #hashtags in tweet text ---- */
       const LINKIFY_RE =
         /(https?:\/\/[^\s]+)|((?<![\w@])@[A-Za-z0-9_]{1,15})|((?<![\w#])#[\p{L}\p{N}_]+)/gu;
