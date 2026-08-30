@@ -31,6 +31,8 @@ go build -o tbd ./cmd/tbd
 
 The service listens on `http://localhost:41008`. Keep this terminal window running while you use it.
 
+Only this machine can reach it. To open the dashboard from a phone or another computer on the same network, start it with `./tbd --listen :41008` — the startup line then prints the LAN address to visit. TBD has no password, so anyone who can reach that address can read and delete the archive; use it only on a network you trust. The userscript still syncs from a browser on this machine.
+
 ### 2. Install the Tampermonkey script
 
 Open <http://localhost:41008>. On a first run (before any bookmarks exist) it lands directly on the **Set up** guide — just follow its three steps:

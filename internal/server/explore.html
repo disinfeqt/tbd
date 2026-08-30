@@ -112,6 +112,9 @@
         gap: 12px;
       }
       /* Context, not navigation: everything clickable lives in the menu. */
+      .statline:empty {
+        display: none;
+      }
       .statline {
         display: flex;
         align-items: center;
@@ -120,26 +123,6 @@
         font-size: 12.5px;
         color: var(--muted);
         font-variant-numeric: tabular-nums;
-      }
-      .statline button.stat {
-        font: inherit;
-        color: var(--ink-2);
-        background: none;
-        border: none;
-        padding: 0;
-        cursor: pointer;
-      }
-      .statline button.stat:hover {
-        color: var(--ink);
-      }
-      .statline button.stat:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
-        border-radius: 4px;
-      }
-      .statline b {
-        color: var(--ink);
-        font-weight: 600;
       }
       .statline .warn {
         display: inline-flex;
@@ -739,6 +722,11 @@
         outline-offset: 1px;
       }
 
+      /* The wrapper only becomes a box on narrow screens; here its children
+         lay out as direct members of .bar, as if it were not there. */
+      .barrow {
+        display: contents;
+      }
       .selwrap {
         position: relative;
         margin-left: auto;
@@ -1082,12 +1070,6 @@
         border-radius: 16px;
         overflow: hidden;
       }
-      @media (max-width: 720px) {
-        .lb-panel {
-          grid-template-columns: 1fr;
-          overflow-y: auto;
-        }
-      }
       .lb-media {
         min-height: 280px;
         display: flex;
@@ -1187,11 +1169,6 @@
       .lb-mnav:disabled {
         opacity: 0 !important;
         pointer-events: none;
-      }
-      @media (hover: none) {
-        .lb-mnav:not(:disabled) {
-          opacity: 1;
-        }
       }
       .lb-strip {
         flex: none;
@@ -1432,6 +1409,385 @@
         font-size: 15px;
         cursor: pointer;
       }
+
+      /* ---- Narrow screens ----
+         The rules above assume room for several columns and a mouse; this is
+         the one place that stops assuming either. */
+      @media (max-width: 720px) {
+        main {
+          padding: 16px 12px 56px;
+        }
+
+        /* Title, account and menu share the top line. Unwrapping .headright
+           lets the alert — the only thing left in the stat line — order itself
+           onto a line of its own underneath, on the rare occasion there is one. */
+        header.page {
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        header.page h1 {
+          font-size: 18px;
+        }
+        .headright {
+          display: contents;
+        }
+        .brandrow {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+        .menu {
+          order: 2;
+          margin-left: auto;
+        }
+        .statline {
+          order: 3;
+          flex: 1 1 100%;
+        }
+        .menupop {
+          max-width: calc(100vw - 24px);
+        }
+
+        /* Drop the bar's own box so the row inside it sticks to the page
+           rather than to the bar: a sticky element travels only as far as its
+           parent's box, and the bar is barely taller than the row itself. */
+        .bar {
+          display: contents;
+        }
+        .search {
+          max-width: none;
+          margin-bottom: 8px;
+        }
+        /* Anything under 16px makes iOS Safari zoom the page in on focus. */
+        .search input {
+          font-size: 16px;
+          padding-top: 8px;
+          padding-bottom: 8px;
+        }
+        /* Only the filters stay pinned, on one row: search and the header
+           scroll away, so the strip that follows you down a long archive is
+           about 44px tall instead of the whole top of the page. */
+        .barrow {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          margin: 0 -12px 10px;
+          padding: 8px 12px;
+          background: color-mix(in srgb, var(--page) 92%, transparent);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border-bottom: 1px solid var(--border);
+        }
+        /* Basis 0 keeps the tabs from forcing the sort onto its own line; the
+           overflow they would have caused scrolls sideways instead. */
+        .tabs {
+          flex: 1 1 0;
+          min-width: 0;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .tabs::-webkit-scrollbar {
+          display: none;
+        }
+        .selwrap {
+          flex: none;
+          margin-left: 0;
+        }
+
+        /* Tighter gutter buys a second column; colCount() reads it back. */
+        #grid,
+        #grid .gcol {
+          gap: 10px;
+        }
+
+        /* Drop the proportion bars: the counts say the same thing and the
+           labels need the width more than the comparison does. */
+        .srow .strack {
+          display: none;
+        }
+        .srow.author {
+          grid-template-columns: 20px minmax(0, 1fr) 48px;
+        }
+        .srow.plain {
+          grid-template-columns: minmax(0, 1fr) 48px;
+        }
+        .dlfile {
+          grid-template-columns: minmax(0, 1fr) 56px 44px;
+        }
+        .field label {
+          flex: 1 1 100%;
+          min-width: 0;
+        }
+        .field input[type="text"] {
+          min-width: 0;
+        }
+
+        /* The lightbox is the feed instead; see "Mobile feed" below. */
+      }
+
+      /* ---- Mobile feed ----
+         The narrow-screen lightbox: one bookmark per screen, snapped to the
+         viewport, the tweet overlaid on its media. Scripting adds .feed only
+         when the narrow breakpoint matches, so none of this reaches the
+         desktop panel and none of it needs a media query of its own. */
+      #lb.feed {
+        padding: 0;
+      }
+      #lb.feed .lb-panel {
+        display: block;
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 0;
+        background: #000;
+      }
+      /* The single-media box (carousel arrows and all) and the prev/next pair
+         are the panel's way of navigating; the feed just scrolls. */
+      #lb.feed .lb-media,
+      #lb.feed .lb-nav {
+        display: none;
+      }
+      .lb-feed {
+        height: 100%;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scroll-snap-type: y mandatory;
+        scrollbar-width: none;
+      }
+      .lb-feed::-webkit-scrollbar {
+        display: none;
+      }
+      .lb-pane {
+        position: relative;
+        height: 100%;
+        display: flex;
+        overflow: hidden;
+        /* stop: always keeps a fast flick from skipping past bookmarks. */
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+      }
+      /* A tweet's own media sits on a horizontal track, so a sideways swipe
+         moves through the set while a vertical one moves to the next tweet. */
+      .lb-track {
+        flex: 1;
+        display: flex;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+      .lb-track::-webkit-scrollbar {
+        display: none;
+      }
+      .lb-slide {
+        flex: none;
+        width: 100%;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        scroll-snap-align: center;
+      }
+      .lb-slide img,
+      .lb-slide video {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+      .lb-slide .pending {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 13px;
+      }
+      .lb-slide .lb-quote {
+        padding: 32px 24px;
+        font-size: 18px;
+        line-height: 1.55;
+        color: #fff;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-y: auto;
+        max-height: 100%;
+      }
+      .lb-dots {
+        position: absolute;
+        top: calc(14px + env(safe-area-inset-top));
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        pointer-events: none;
+      }
+      .lb-dots span {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.4);
+      }
+      .lb-dots span.on {
+        background: #fff;
+      }
+
+      /* The one .lb-side follows whichever pane is showing, as an overlay. */
+      #lb.feed .lb-side {
+        position: absolute;
+        inset: auto 0 0 0;
+        max-height: 38%;
+        overflow: hidden;
+        gap: 5px;
+        padding: 22px 14px calc(10px + env(safe-area-inset-bottom));
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(0, 0, 0, 0.45) 45%,
+          rgba(0, 0, 0, 0.76)
+        );
+        /* A swipe that starts down here has to reach the feed underneath, and
+           the author sits exactly where an upward swipe begins — so nothing
+           takes taps until the tweet has been asked for. */
+        pointer-events: none;
+      }
+      /* The author is all that rides over the video; a tap on the media brings
+         the rest of the tweet up, another sends it back. Collapsing them out
+         of the flow shrinks the gradient with them. */
+      #lb.feed:not(.chrome) .lb-text,
+      #lb.feed:not(.chrome) .lb-date,
+      #lb.feed:not(.chrome) .lb-actions {
+        display: none;
+      }
+      #lb.feed.chrome .lb-author,
+      #lb.feed.chrome .lb-date,
+      #lb.feed.chrome .lb-actions {
+        pointer-events: auto;
+      }
+      /* Every row squeezed onto as few lines as it can manage — whatever the
+         overlay takes, it takes from the video. */
+      #lb.feed .lb-author {
+        gap: 7px;
+      }
+      #lb.feed .lb-author .avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+      }
+      /* Name beside handle rather than stacked above it. */
+      #lb.feed .lb-author .who {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        min-width: 0;
+      }
+      #lb.feed .lb-author .who b {
+        display: inline;
+        font-size: 13px;
+      }
+      #lb.feed .lb-author .who span {
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      /* Clamped rather than scrollable: a tall caption must not turn the
+         bottom of the screen into a text scroller. The date opens the tweet
+         on X for anything longer. */
+      #lb.feed .lb-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: 13.5px;
+        line-height: 1.45;
+      }
+      #lb.feed .lb-date {
+        font-size: 12px;
+      }
+      /* Over the media there is only one palette, whatever the theme is. */
+      #lb.feed .lb-side,
+      #lb.feed .lb-text,
+      #lb.feed .lb-author .who b {
+        color: #fff;
+      }
+      #lb.feed .lb-author .who span,
+      #lb.feed .lb-date,
+      #lb.feed .lb-confirm .cq,
+      #lb.feed .lb-confirm .quiet {
+        color: rgba(255, 255, 255, 0.72);
+      }
+      #lb.feed .lb-text a,
+      #lb.feed .lb-quote a {
+        color: #8ab4f8;
+      }
+      #lb.feed .lb-actions {
+        gap: 6px;
+        padding-top: 7px;
+        border-top: none;
+      }
+      /* Tighter than the touch sizing above, which is why the id wins. */
+      #lb.feed .lb-actions a,
+      #lb.feed .lb-actions button {
+        font-size: 12.5px;
+        padding: 6px 11px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.35);
+        border-color: rgba(255, 255, 255, 0.32);
+      }
+      #lb.feed .lb-actions .iconbtn {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        color: rgba(255, 255, 255, 0.8);
+      }
+      #lb.feed .lb-close {
+        top: calc(10px + env(safe-area-inset-top));
+        right: 10px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.45);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+
+      /* ---- Touch ----
+         Pointer-sized hit areas are hard to land with a thumb. Pad the
+         controls out; none of this changes how they read. */
+      @media (hover: none) {
+        /* Nothing reveals these, so they stay visible. */
+        .lb-mnav:not(:disabled) {
+          opacity: 1;
+        }
+        .tabs button {
+          padding: 7px 14px;
+        }
+        .menu summary,
+        .acct select,
+        .spback {
+          padding: 7px 14px;
+        }
+        .selwrap select {
+          padding: 8px 30px 8px 14px;
+        }
+        .chip {
+          padding: 5px 6px 5px 12px;
+        }
+        .chip button {
+          padding: 4px 8px;
+        }
+        .lb-actions a,
+        .lb-actions button {
+          padding: 9px 14px;
+        }
+        .lb-actions .iconbtn {
+          width: 38px;
+          height: 38px;
+        }
+        /* A tap leaves :hover stuck on the card it opened. */
+        .mcard:hover {
+          transform: none;
+          box-shadow: 0 0 0 1px var(--border);
+        }
+      }
     </style>
   </head>
   <body>
@@ -1447,7 +1803,8 @@
           </span>
         </div>
         <div class="headright">
-          <div class="statline" id="statline">Your X bookmarks archive</div>
+          <!-- Filled in only when setup needs attention, or stats fail to load. -->
+          <div class="statline" id="statline"></div>
           <details class="menu" id="menu">
             <summary id="menubtn">Menu</summary>
             <div class="menupop" id="menupop"></div>
@@ -1477,22 +1834,24 @@
             aria-label="Search bookmarks"
           />
         </div>
-        <div
-          class="tabs"
-          role="group"
-          aria-label="Filter by media type"
-          id="tabs"
-        ></div>
-        <span class="selwrap">
-          <select id="sort" aria-label="Sort order">
-            <option value="newest">Recently added</option>
-            <option value="oldest">Oldest added</option>
-            <option value="tweet-newest">Newest tweets</option>
-            <option value="tweet-oldest">Oldest tweets</option>
-            <option value="longest">Longest video</option>
-            <option value="shortest">Shortest video</option>
-          </select>
-        </span>
+        <div class="barrow">
+          <div
+            class="tabs"
+            role="group"
+            aria-label="Filter by media type"
+            id="tabs"
+          ></div>
+          <span class="selwrap">
+            <select id="sort" aria-label="Sort order">
+              <option value="newest">Recently added</option>
+              <option value="oldest">Oldest added</option>
+              <option value="tweet-newest">Newest tweets</option>
+              <option value="tweet-oldest">Oldest tweets</option>
+              <option value="longest">Longest video</option>
+              <option value="shortest">Shortest video</option>
+            </select>
+          </span>
+        </div>
       </div>
 
       <span id="chip" class="chip" hidden>
@@ -1525,6 +1884,7 @@
       <button class="lb-nav next" id="lbnext" aria-label="Next">→</button>
       <div class="lb-panel">
         <div class="lb-media" id="lbmedia"></div>
+        <div class="lb-feed" id="lbfeed" hidden></div>
         <div class="lb-side">
           <div class="lb-author">
             <span class="avatar" id="lbavatar"></span>
@@ -1743,17 +2103,10 @@
       function renderStatline(stats) {
         lastStats = stats;
 
+        // Only ever holds an alert: the bookmark total it used to carry is
+        // already in the count bar under the filters, and in the menu.
         const line = $("#statline");
         line.textContent = "";
-        const count = stats.totals.bookmarks;
-        const total = el("button", "stat");
-        total.title = "Show all bookmarks";
-        total.append(
-          el("b", "", fmt(count)),
-          count === 1 ? " bookmark" : " bookmarks",
-        );
-        total.addEventListener("click", goHome);
-        line.append(total);
 
         const alert = setupAlert();
         if (alert) {
@@ -1930,9 +2283,17 @@
       /* ---- Masonry columns ---- */
       let cols = [];
       let cardNodes = [];
+      const NARROW = matchMedia("(max-width: 720px)");
       function colCount() {
-        const w = $("#grid").clientWidth;
-        return Math.max(1, Math.min(4, Math.floor((w + 14) / (240 + 14))));
+        // Phones get a fixed pair: fitting 240px columns would leave one
+        // stack of oversized cards, and the same query drives the layout.
+        if (NARROW.matches) return 2;
+        const grid = $("#grid");
+        const gap = parseFloat(getComputedStyle(grid).columnGap) || 14;
+        return Math.max(
+          1,
+          Math.min(4, Math.floor((grid.clientWidth + gap) / (240 + gap))),
+        );
       }
       function setupColumns() {
         const grid = $("#grid");
@@ -2187,16 +2548,25 @@
         const s = $("#more");
         return !s.hidden && s.getBoundingClientRect().top < innerHeight + 600;
       }
-      async function maybeLoadMore() {
-        if (loadingMore || !sentinelNear()) return;
+      // The one way to pull the next page, whoever asks: the grid's sentinel,
+      // the feed running out of panes, or the panel's next arrow. Returns how
+      // many items arrived, so callers can stop when the archive runs out.
+      async function loadMoreItems() {
+        if (loadingMore || $("#more").hidden) return 0;
         const gen = loadGen;
         loadingMore = true;
         state.page++;
+        const before = state.items.length;
         await loadPage(true);
         loadingMore = false;
-        // Keep filling until the sentinel leaves the viewport margin;
-        // a reset mid-flight owns the next fill instead.
-        if (gen === loadGen) maybeLoadMore();
+        // A reset mid-flight owns whatever it loaded; this call has nothing.
+        return gen === loadGen ? state.items.length - before : 0;
+      }
+      async function maybeLoadMore() {
+        if (!sentinelNear()) return;
+        const gen = loadGen;
+        // Keep filling until the sentinel leaves the viewport margin.
+        if ((await loadMoreItems()) && gen === loadGen) maybeLoadMore();
       }
       new IntersectionObserver(
         (entries) => {
@@ -2278,7 +2648,7 @@
         state.month = "";
       }
 
-      // Logo / "bookmarks" stat: back to the unfiltered grid.
+      // Logo: back to the unfiltered grid.
       function goHome() {
         clearFilters();
         state.sort = "newest";
@@ -2755,14 +3125,198 @@
       function openLb(i) {
         lbIndex = i;
         lbMediaIndex = 0;
-        fillLb();
+        resetFeed();
+        const asFeed = NARROW.matches;
+        $("#lb").classList.toggle("feed", asFeed);
+        $("#lb").classList.remove("chrome");
         $("#lb").classList.add("open");
         document.body.style.overflow = "hidden";
+        if (asFeed) openFeed(i);
+        else fillLb();
       }
       function closeLb() {
         $("#lb").classList.remove("open");
         document.body.style.overflow = "";
         $("#lbmedia").textContent = ""; // stop any playing video
+        resetFeed();
+      }
+      // Crossing the breakpoint with the lightbox open rebuilds it in the
+      // other mode, on the bookmark that was showing.
+      NARROW.addEventListener("change", () => {
+        if ($("#lb").classList.contains("open")) openLb(lbIndex);
+      });
+
+      /* ---- Mobile feed ----
+         One pane per bookmark, snapped to the viewport, so the browser owns
+         the scrolling physics. Panes carry only media: the author, text and
+         actions stay in the single .lb-side, overlaid and refilled as the
+         showing pane changes. Only the three panes around the reader hold
+         real media — the rest are empty boxes of the right height. */
+      let feedPanes = [];
+      let feedObserver = null;
+      let feedLive = false;
+      const filledPanes = new Set();
+
+      function resetFeed() {
+        if (feedObserver) feedObserver.disconnect();
+        feedObserver = null;
+        feedLive = false;
+        feedPanes = [];
+        filledPanes.clear();
+        const box = $("#lbfeed");
+        box.textContent = "";
+        box.hidden = true;
+      }
+
+      function openFeed(i) {
+        const box = $("#lbfeed");
+        box.hidden = false;
+        feedObserver = new IntersectionObserver(onFeedPane, {
+          root: box,
+          threshold: 0.6,
+        });
+        appendPanes(state.items.length);
+        fillLbSide();
+        windowPanes(i);
+        // Every pane is exactly one viewport tall, so the offset is the index.
+        // Jump before observing, or the panes we pass on the way report in and
+        // drag lbIndex back up the feed.
+        box.scrollTop = i * box.clientHeight;
+        feedLive = true;
+        for (const pane of feedPanes) feedObserver.observe(pane);
+        extendFeed();
+      }
+
+      function appendPanes(count) {
+        const box = $("#lbfeed");
+        for (let k = 0; k < count; k++) {
+          const j = feedPanes.length;
+          const pane = el("div", "lb-pane");
+          pane.dataset.i = String(j);
+          // Bound to the pane, not its contents, which are torn down and
+          // rebuilt as the reader moves.
+          pane.addEventListener("click", toggleChrome);
+          feedPanes.push(pane);
+          box.append(pane);
+          if (feedLive && feedObserver) feedObserver.observe(pane);
+        }
+      }
+
+      function onFeedPane(entries) {
+        if (!feedLive) return;
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const i = Number(e.target.dataset.i);
+          if (i === lbIndex) continue;
+          lbIndex = i;
+          lbMediaIndex = 0;
+          fillLbSide();
+          windowPanes(i);
+          extendFeed();
+        }
+      }
+
+      // Stay a few panes ahead of the reader: the feed should not end where
+      // the grid happened to stop loading.
+      async function extendFeed() {
+        while (feedLive && lbIndex >= feedPanes.length - 3) {
+          const added = await loadMoreItems();
+          if (!added || !feedLive) return;
+          appendPanes(added);
+        }
+      }
+
+      function windowPanes(i) {
+        for (const j of [...filledPanes]) if (Math.abs(j - i) > 1) clearPane(j);
+        for (const j of [i - 1, i, i + 1]) fillPane(j);
+        pausePane(i - 1);
+        pausePane(i + 1);
+        playPane(i);
+      }
+
+      function fillPane(j) {
+        const pane = feedPanes[j];
+        const t = state.items[j];
+        if (!pane || !t || filledPanes.has(j)) return;
+        filledPanes.add(j);
+
+        const media = t.media || [];
+        if (!media.length) {
+          const quote = el("div", "lb-quote");
+          quote.append(linkify(t.full_text || "(no text)"));
+          const slide = el("div", "lb-slide");
+          slide.append(quote);
+          pane.append(slide);
+          return;
+        }
+
+        const track = el("div", "lb-track");
+        for (const item of media) {
+          const slide = el("div", "lb-slide");
+          slide.append(lbMediaEl(item, true));
+          track.append(slide);
+        }
+        pane.append(track);
+        if (media.length < 2) return;
+
+        const dots = el("div", "lb-dots");
+        media.forEach((_, k) => dots.append(el("span", k ? "" : "on")));
+        pane.append(dots);
+        track.addEventListener(
+          "scroll",
+          () => {
+            const at = slideIndex(track);
+            for (const [k, dot] of [...dots.children].entries())
+              dot.classList.toggle("on", k === at);
+            if (j !== lbIndex) return;
+            lbMediaIndex = at;
+            pausePane(j);
+            playPane(j);
+          },
+          { passive: true },
+        );
+      }
+
+      function clearPane(j) {
+        const pane = feedPanes[j];
+        if (!pane) return;
+        filledPanes.delete(j);
+        pane.textContent = ""; // drops the <video>, stopping its download
+      }
+
+      const slideIndex = (track) =>
+        Math.round(track.scrollLeft / (track.clientWidth || 1));
+
+      function currentSlide(j) {
+        const pane = feedPanes[j];
+        if (!pane) return null;
+        const track = pane.querySelector(".lb-track");
+        if (!track) return pane.querySelector(".lb-slide");
+        return track.children[slideIndex(track)] || track.firstElementChild;
+      }
+
+      function playPane(j) {
+        const slide = currentSlide(j);
+        const v = slide && slide.querySelector("video");
+        if (!v) return;
+        // Opening and swiping are user gestures, so sound is usually allowed;
+        // where the browser refuses anyway, fall back to a muted play.
+        v.play().catch(() => {
+          v.muted = true;
+          v.play().catch(() => {});
+        });
+      }
+
+      function pausePane(j) {
+        const pane = feedPanes[j];
+        if (!pane) return;
+        for (const v of pane.querySelectorAll("video")) v.pause();
+      }
+
+      // The tweet itself is hidden by default so nothing sits on the media;
+      // the state carries across swipes until it is tapped away again.
+      function toggleChrome() {
+        $("#lb").classList.toggle("chrome");
       }
       /* ---- Linkify URLs, @mentions, and #hashtags in tweet text ---- */
       const LINKIFY_RE =
@@ -2793,7 +3347,7 @@
         return frag;
       }
 
-      function lbMediaEl(item) {
+      function lbMediaEl(item, feed) {
         if (!item.file || item.missing) {
           return el(
             "div",
@@ -2808,7 +3362,13 @@
           v.src = mediaSrc(item);
           v.preload = "metadata";
           v.playsInline = true;
-          if (item.type === "animated_gif") {
+          const gif = item.type === "animated_gif";
+          if (feed) {
+            // The feed plays whichever pane is showing and a tap pauses it,
+            // so native controls would only collide with the overlay.
+            v.loop = true;
+            v.muted = gif;
+          } else if (gif) {
             v.muted = true;
             v.loop = true;
             v.autoplay = true;
@@ -2919,6 +3479,13 @@
         const t = state.items[lbIndex];
         if (!t) return;
         renderLbMedia(t);
+        fillLbSide();
+      }
+      // Everything about the tweet that is not its media. The feed shows the
+      // same element as an overlay, moving it to whichever pane is on screen.
+      function fillLbSide() {
+        const t = state.items[lbIndex];
+        if (!t) return;
         const av = avatarEl(t);
         av.id = "lbavatar";
         $("#lbavatar").replaceWith(av);
@@ -2937,7 +3504,9 @@
         );
         hideConfirm();
         $("#lbprev").disabled = lbIndex <= 0;
-        $("#lbnext").disabled = lbIndex >= state.items.length - 1;
+        // Not the end of the archive while there are pages left to fetch.
+        $("#lbnext").disabled =
+          lbIndex >= state.items.length - 1 && $("#more").hidden;
       }
       $("#lbclose").addEventListener("click", closeLb);
       $("#lb").addEventListener("click", (e) => {
@@ -2950,7 +3519,8 @@
           fillLb();
         }
       });
-      $("#lbnext").addEventListener("click", () => {
+      $("#lbnext").addEventListener("click", async () => {
+        if (lbIndex >= state.items.length - 1) await loadMoreItems();
         if (lbIndex < state.items.length - 1) {
           lbIndex++;
           lbMediaIndex = 0;
@@ -2959,7 +3529,9 @@
       });
       addEventListener("keydown", (e) => {
         if (!$("#lb").classList.contains("open")) return;
-        if (e.key === "Escape") closeLb();
+        if (e.key === "Escape") return closeLb();
+        // The feed scrolls itself; only the panel has arrows to drive.
+        if (NARROW.matches) return;
         // Arrows step through a tweet's own media first, then move on to the
         // previous/next tweet.
         if (e.key === "ArrowLeft" && !stepLbMedia(-1)) $("#lbprev").click();

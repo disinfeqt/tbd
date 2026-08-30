@@ -4,6 +4,7 @@ package server
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 
@@ -22,8 +23,66 @@ func Start(addr string) error {
 	http.HandleFunc("/tbd.user.js", handleUserscriptFile)
 	registerExploreRoutes()
 
-	logx.Infof("TBD is ready — dashboard at http://localhost:41008 · keep this window running")
+	urls, beyondLocalhost := dashboardURLs(addr)
+	if beyondLocalhost {
+		logx.Warn("Listening beyond this machine — anyone who can reach it may read and delete the archive; TBD has no password")
+	}
+	logx.Infof("TBD is ready — dashboard at %s · keep this window running", strings.Join(urls, " or "))
 	return http.ListenAndServe(addr, nil)
+}
+
+// dashboardURLs turns a listen address into the URLs that reach the dashboard,
+// and reports whether that address is open to more than this machine. A
+// wildcard bind lists the machine's LAN addresses, which is the point of
+// asking for one.
+func dashboardURLs(addr string) (urls []string, beyondLocalhost bool) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return []string{"http://" + addr}, true
+	}
+
+	if host != "" && host != "0.0.0.0" && host != "::" {
+		if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+			host = "localhost"
+		}
+		return []string{"http://" + net.JoinHostPort(host, port)}, host != "localhost"
+	}
+
+	urls = []string{"http://" + net.JoinHostPort("localhost", port)}
+	for _, ip := range lanIPs() {
+		urls = append(urls, "http://"+net.JoinHostPort(ip, port))
+	}
+	return urls, true
+}
+
+// lanIPs lists the IPv4 addresses this machine answers to on the network.
+func lanIPs() []string {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		logx.Error(eris.Wrap(err, "Failed to list network interfaces"))
+		return nil
+	}
+
+	var ips []string
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if ip := ipNet.IP.To4(); ip != nil && !ip.IsLinkLocalUnicast() {
+				ips = append(ips, ip.String())
+			}
+		}
+	}
+	return ips
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {
