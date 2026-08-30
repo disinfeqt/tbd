@@ -3083,6 +3083,8 @@
       };
       let dlWasBusy = false;
       let dlTimer = null;
+      // Parse time counts as checked: boot fetches setup itself.
+      let setupCheckedAt = Date.now();
       async function pollDownloads() {
         let data = null;
         try {
@@ -3127,10 +3129,12 @@
           statsCache = null;
           loadStats().catch(() => {});
         }
-        // A setup warning resolves in another tab (installing the script, the
-        // first sync); while one shows, re-check on the idle cadence so the
-        // chip can clear itself instead of outliving the problem.
-        if (!busy && setupCache && setupAlert()) {
+        // Setup status changes outside this tab — the script gets installed or
+        // updated on x.com, or the app restarts with a newer bundled script.
+        // Re-check on a slow cadence either way: a chip must appear the moment
+        // the script falls behind, not only clear once it catches up.
+        if (Date.now() - setupCheckedAt > 15000) {
+          setupCheckedAt = Date.now();
           const before = setupAlert();
           try {
             await loadSetup(true);
