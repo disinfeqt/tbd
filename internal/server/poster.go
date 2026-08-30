@@ -92,7 +92,7 @@ func handlePoster(w http.ResponseWriter, r *http.Request) {
 
 	cached := posterPath(accountID, decoded)
 	if posterStale(cached, info.ModTime()) {
-		if err := extractPoster(r.Context(), source, cached); err != nil {
+		if err := extractPoster(r.Context(), source, cached, info.ModTime()); err != nil {
 			logx.Error(eris.Wrapf(err, "Failed to extract a poster from %s", decoded))
 			http.NotFound(w, r)
 			return
@@ -112,7 +112,7 @@ func posterStale(cached string, source time.Time) bool {
 	return err != nil || info.Size() == 0 || info.ModTime().Before(source)
 }
 
-func extractPoster(ctx context.Context, source, cached string) error {
+func extractPoster(ctx context.Context, source, cached string, sourceMod time.Time) error {
 	bin := ffmpeg()
 	if bin == "" {
 		return eris.New("ffmpeg is not installed")
@@ -121,11 +121,18 @@ func extractPoster(ctx context.Context, source, cached string) error {
 		return eris.Wrap(err, "failed to create the poster directory")
 	}
 
-	posterSlots <- struct{}{}
+	// The queue can outlive the request that joined it: a scroll past a page
+	// of videos abandons its frames, and their slots should go to whoever is
+	// still watching.
+	select {
+	case posterSlots <- struct{}{}:
+	case <-ctx.Done():
+		return eris.Wrap(ctx.Err(), "gave up waiting for a poster slot")
+	}
 	defer func() { <-posterSlots }()
 
 	// Another request may have finished this frame while this one queued.
-	if info, err := os.Stat(cached); err == nil && info.Size() > 0 {
+	if !posterStale(cached, sourceMod) {
 		return nil
 	}
 

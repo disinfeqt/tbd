@@ -3354,6 +3354,7 @@
         filledPanes.clear();
         const box = $("#lbfeed");
         box.textContent = "";
+        box.style.scrollSnapType = ""; // a close can race growFeed's restore
         box.hidden = true;
       }
 
@@ -3409,10 +3410,31 @@
       // the grid happened to stop loading.
       async function extendFeed() {
         while (feedLive && lbIndex >= feedPanes.length - 3) {
-          const added = await loadMoreItems();
-          if (!added || !feedLive) return;
-          appendPanes(added);
+          // The grid's own infinite scroll keeps paging behind the feed, so
+          // items may already be ahead of the panes; fetch only once every
+          // loaded item has one.
+          if (feedPanes.length >= state.items.length) {
+            const added = await loadMoreItems();
+            if (!added || !feedLive) return;
+          }
+          growFeed();
         }
+      }
+
+      // Appending to a mandatory-snap scroller makes iOS Safari re-snap, and
+      // it re-snaps to the FIRST pane — throwing the reader back to the top
+      // of the feed just as they reach the end of what was loaded. Lift the
+      // snapping around the append and hold the offset until layout settles.
+      function growFeed() {
+        const box = $("#lbfeed");
+        const at = box.scrollTop;
+        box.style.scrollSnapType = "none";
+        appendPanes(state.items.length - feedPanes.length);
+        box.scrollTop = at;
+        requestAnimationFrame(() => {
+          box.scrollTop = at;
+          box.style.scrollSnapType = "";
+        });
       }
 
       function windowPanes(i) {
